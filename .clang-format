@@ -1,0 +1,15 @@
+---
+# Default style
+BasedOnStyle: Google
+IndentWidth: 4
+---
+# Language specific rules for C/C++
+Language: Cpp
+Standard: c++17
+---
+# Language specific rules for Protocol Buffers
+Language: Proto
+---
+# Language specific rules for Protocol Buffer messages in text format
+Language: TextProto
+...
