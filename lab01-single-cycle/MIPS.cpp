@@ -95,7 +95,27 @@ class RF {
          * depending on the value of WrtEnable. Put the read results to the
          * ReadData1 and ReadData2.
          */
-        // TODO: implement!
+        dout << debug::bg::magenta << "  RF  ";
+
+        if (WrtData == 1) {
+            auto reg_idx = WrtReg.to_ulong();
+            Registers[reg_idx] = WrtData;
+
+            dout << debug::bg::red << " WRITE " << debug::reset << setfill('0')
+                 << setw(2) << right << "R" << reg_idx << "=" << WrtData
+                 << endl;
+
+        } else {
+            auto reg1_idx = RdReg1.to_ulong();
+            auto reg2_idx = RdReg2.to_ulong();
+            ReadData1 = Registers[reg1_idx];
+            ReadData2 = Registers[reg2_idx];
+
+            dout << debug::bg::blue << " READ  " << debug::reset << setfill('0')
+                 << setw(2) << right << "R" << reg1_idx << "=" << ReadData1
+                 << ",R" << reg2_idx << "=" << ReadData2 << endl;
+        }
+        std::cout.copyfmt(oldCoutState);
     }
 
     void OutputRF() {
