@@ -1,4 +1,5 @@
 #include <bitset>
+#include <exception>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -229,6 +230,9 @@ class DataMem {
          * Bytes in DMem. If readmem enabled, return the DMem read result as
          * readdata.
          */
+        if ((readmem & writemem) == 1) {
+            throw logic_error("data mem op conflict");
+        }
         unsigned address = Address.to_ulong();
 
         if (readmem == 1) {
