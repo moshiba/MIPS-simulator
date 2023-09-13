@@ -148,7 +148,29 @@ class ALU {
          * ALU operation depends on the ALUOP, which are definded as ADDU, SUBU,
          * etc.
          */
-        // TODO: implement!
+        switch (ALUOP.to_ulong()) {
+            case 1: {  // addu
+                ALUresult =
+                    bitset< 32 >(oprand1.to_ulong() + oprand2.to_ulong());
+            }
+            case 3: {  // subu
+                ALUresult =
+                    bitset< 32 >(oprand1.to_ulong() - oprand2.to_ulong());
+            }
+            case 4: {  // and
+                ALUresult = oprand1 & oprand2;
+            }
+            case 5: {  // or
+                ALUresult = oprand1 | oprand2;
+            }
+            case 7: {  // nor
+                ALUresult = oprand1 ^ oprand2;
+            }
+            default: {
+                throw runtime_error("ALU: unknown op");
+            }
+        }
+
         return ALUresult;
     }
 };
