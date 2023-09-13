@@ -6,6 +6,7 @@ IndentWidth: 4
 # Language specific rules for C/C++
 Language: Cpp
 Standard: c++17
+SpacesInAngles: Always
 ---
 # Language specific rules for Protocol Buffers
 Language: Proto
