@@ -65,6 +65,9 @@ debug_cout& operator<<(debug_cout& s, std::ostream& (*f)(std::ios_base&)) {
 
 std::ios oldCoutState(nullptr);
 
+using B32 = std::bitset< 32 >;
+using B8 = std::bitset< 8 >;
+
 using namespace std;
 
 #define ADDU (1)
@@ -150,12 +153,10 @@ class ALU {
          */
         switch (ALUOP.to_ulong()) {
             case 1: {  // addu
-                ALUresult =
-                    bitset< 32 >(oprand1.to_ulong() + oprand2.to_ulong());
+                ALUresult = B32(oprand1.to_ulong() + oprand2.to_ulong());
             }
             case 3: {  // subu
-                ALUresult =
-                    bitset< 32 >(oprand1.to_ulong() - oprand2.to_ulong());
+                ALUresult = B32(oprand1.to_ulong() - oprand2.to_ulong());
             }
             case 4: {  // and
                 ALUresult = oprand1 & oprand2;
@@ -258,10 +259,10 @@ class DataMem {
         unsigned address = Address.to_ulong();
 
         if (readmem == 1) {
-            readdata = bitset< 32 >(DMem[address + 0].to_ulong() << 24 |
-                                    DMem[address + 1].to_ulong() << 16 |
-                                    DMem[address + 2].to_ulong() << 8 |
-                                    DMem[address + 3].to_ulong() << 0);
+            readdata = B32(DMem[address + 0].to_ulong() << 24 |
+                           DMem[address + 1].to_ulong() << 16 |
+                           DMem[address + 2].to_ulong() << 8 |
+                           DMem[address + 3].to_ulong() << 0);
 
             dout << debug::bg::green << " DMEM " << debug::bg::blue << " READ  "
                  << debug::reset << "[" << setfill('0') << setw(5) << right
@@ -271,10 +272,10 @@ class DataMem {
         }
 
         if (writemem == 1) {
-            DMem[address + 0] = bitset< 8 >((WriteData >> 24).to_ulong());
-            DMem[address + 1] = bitset< 8 >((WriteData >> 16).to_ulong());
-            DMem[address + 2] = bitset< 8 >((WriteData >> 8).to_ulong());
-            DMem[address + 3] = bitset< 8 >((WriteData >> 0).to_ulong());
+            DMem[address + 0] = B8((WriteData >> 24).to_ulong());
+            DMem[address + 1] = B8((WriteData >> 16).to_ulong());
+            DMem[address + 2] = B8((WriteData >> 8).to_ulong());
+            DMem[address + 3] = B8((WriteData >> 0).to_ulong());
 
             dout << debug::bg::green << " DMEM " << debug::bg::red << " WRITE "
                  << debug::reset << "[" << setfill('0') << setw(5) << right
