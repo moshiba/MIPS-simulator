@@ -1,5 +1,4 @@
 #include <bitset>
-#include <exception>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -210,7 +209,34 @@ class DataMem {
          * Bytes in DMem. If readmem enabled, return the DMem read result as
          * readdata.
          */
-        // TODO: implement!
+        unsigned address = Address.to_ulong();
+
+        if (readmem == 1) {
+            readdata = bitset< 32 >(DMem[address + 0].to_ulong() << 24 |
+                                    DMem[address + 1].to_ulong() << 16 |
+                                    DMem[address + 2].to_ulong() << 8 |
+                                    DMem[address + 3].to_ulong() << 0);
+
+            dout << debug::bg::green << " DMEM " << debug::bg::blue << " READ  "
+                 << debug::reset << "[" << setfill('0') << setw(5) << right
+                 << address << "]"
+                 << "=" << readdata << endl;
+            std::cout.copyfmt(oldCoutState);
+        }
+
+        if (writemem == 1) {
+            DMem[address + 0] = bitset< 8 >((WriteData >> 24).to_ulong());
+            DMem[address + 1] = bitset< 8 >((WriteData >> 16).to_ulong());
+            DMem[address + 2] = bitset< 8 >((WriteData >> 8).to_ulong());
+            DMem[address + 3] = bitset< 8 >((WriteData >> 0).to_ulong());
+
+            dout << debug::bg::green << " DMEM " << debug::bg::red << " WRITE "
+                 << debug::reset << "[" << setfill('0') << setw(5) << right
+                 << address << "]"
+                 << "=" << WriteData << endl;
+            std::cout.copyfmt(oldCoutState);
+        }
+
         return readdata;
     }
 
