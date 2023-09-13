@@ -1,4 +1,5 @@
 #include <bitset>
+#include <exception>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -154,13 +155,24 @@ class INSMem {
     }
 
     bitset< 32 > ReadMemory(bitset< 32 > ReadAddress) {
-        // TODO: implement!
         /**
          * @brief Read Instruction Memory (IMem).
          *
          * Read the byte at the ReadAddress and the following three byte,
          * and return the read result.
          */
+        unsigned address = ReadAddress.to_ulong();
+        Instruction = IMem[address + 0].to_ulong() << 24 |
+                      IMem[address + 1].to_ulong() << 16 |
+                      IMem[address + 2].to_ulong() << 8 |
+                      IMem[address + 3].to_ulong() << 0;
+
+        dout << debug::bg::yellow << " IMEM " << debug::bg::blue << " READ  "
+             << debug::reset << "[" << setfill('0') << setw(5) << right
+             << address << "]"
+             << "=" << Instruction << endl;
+        std::cout.copyfmt(oldCoutState);
+
         return Instruction;
     }
 
@@ -227,27 +239,27 @@ int main() {
     INSMem myInsMem;
     DataMem myDataMem;
 
-    while (1)  // TODO: implement!
+    unsigned PC = 0;
+    while (PC < MemSize)  // TODO: implement!
     {
         // Fetch: fetch an instruction from myInsMem.
-        auto instruction =
-            myInsMem
-                .
+        auto instruction = myInsMem.ReadMemory(PC);
+        PC += 4;
 
-            // If current instruction is "11111111111111111111111111111111",
-            // then break; (exit the while loop)
+        // If current instruction is "11111111111111111111111111111111",
+        // then break; (exit the while loop)
 
-            // decode(Read RF): get opcode and other signals from instruction,
-            // decode instruction
+        // decode(Read RF): get opcode and other signals from instruction,
+        // decode instruction
 
-            // Execute: after decoding, ALU may run and return result
+        // Execute: after decoding, ALU may run and return result
 
-            // Read/Write Mem: access data memory (myDataMem)
+        // Read/Write Mem: access data memory (myDataMem)
 
-            // Write back to RF: some operations may write things to RF
+        // Write back to RF: some operations may write things to RF
 
-            /**** You don't need to modify the following lines. ****/
-            myRF.OutputRF();  // dump RF;
+        /**** You don't need to modify the following lines. ****/
+        myRF.OutputRF();  // dump RF;
     }
     myDataMem.OutputDataMem();  // dump data mem
 
