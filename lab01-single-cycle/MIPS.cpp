@@ -154,18 +154,23 @@ class ALU {
         switch (ALUOP.to_ulong()) {
             case 1: {  // addu
                 ALUresult = B32(oprand1.to_ulong() + oprand2.to_ulong());
+                break;
             }
             case 3: {  // subu
                 ALUresult = B32(oprand1.to_ulong() - oprand2.to_ulong());
+                break;
             }
             case 4: {  // and
                 ALUresult = oprand1 & oprand2;
+                break;
             }
             case 5: {  // or
                 ALUresult = oprand1 | oprand2;
+                break;
             }
             case 7: {  // nor
                 ALUresult = oprand1 ^ oprand2;
+                break;
             }
             default: {
                 throw runtime_error("ALU: unknown op");
