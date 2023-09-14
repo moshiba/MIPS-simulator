@@ -99,15 +99,14 @@ class RF {
          * depending on the value of WrtEnable. Put the read results to the
          * ReadData1 and ReadData2.
          */
-        dout << debug::bg::magenta << "  RF  ";
+        dout << debug::bg::magenta << " REG  ";
 
         if (WrtData == 1) {
             auto reg_idx = WrtReg.to_ulong();
             Registers[reg_idx] = WrtData;
 
-            dout << debug::bg::red << " WRITE " << debug::reset << setfill('0')
-                 << setw(2) << right << "R" << reg_idx << "=" << WrtData
-                 << endl;
+            dout << debug::bg::red << " WRITE " << debug::reset << "R"
+                 << reg_idx << "=" << WrtData << endl;
 
         } else {
             auto reg1_idx = RdReg1.to_ulong();
@@ -115,9 +114,10 @@ class RF {
             ReadData1 = Registers[reg1_idx];
             ReadData2 = Registers[reg2_idx];
 
-            dout << debug::bg::blue << " READ  " << debug::reset << setfill('0')
-                 << setw(2) << right << "R" << reg1_idx << "=" << ReadData1
-                 << ",R" << reg2_idx << "=" << ReadData2 << endl;
+            dout << debug::bg::blue << " READ  " << debug::reset << "R"
+                 << reg1_idx << "=0x" << hex << uppercase << setfill('0')
+                 << setw(8) << ReadData1.to_ulong() << ",R" << dec << reg2_idx
+                 << "=0x" << hex << setw(8) << ReadData2.to_ulong() << endl;
         }
         std::cout.copyfmt(oldCoutState);
     }
@@ -151,6 +151,8 @@ class ALU {
          * ALU operation depends on the ALUOP, which are definded as ADDU, SUBU,
          * etc.
          */
+        dout << " ALU  " << debug::reset << "ctrl=" << ALUOP.to_ulong()
+             << " op1=" << oprand1.to_ulong() << " op2=" << oprand2.to_ulong();
         switch (ALUOP.to_ulong()) {
             case 1: {  // addu
                 ALUresult = B32(oprand1.to_ulong() + oprand2.to_ulong());
@@ -177,6 +179,7 @@ class ALU {
             }
         }
 
+        dout << " result=" << ALUresult.to_ulong() << endl;
         return ALUresult;
     }
 };
