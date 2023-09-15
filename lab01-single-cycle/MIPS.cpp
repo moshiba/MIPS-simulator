@@ -101,7 +101,7 @@ class RF {
          */
         dout << debug::bg::magenta << " REG  ";
 
-        if (WrtData == 1) {
+        if (WrtEnable == 1) {
             auto reg_idx = WrtReg.to_ulong();
             Registers[reg_idx] = WrtData;
 
