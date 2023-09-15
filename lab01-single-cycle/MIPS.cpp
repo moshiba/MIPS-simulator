@@ -321,23 +321,98 @@ int main() {
     DataMem myDataMem;
 
     unsigned PC = 0;
-    while (PC < MemSize)  // TODO: implement!
-    {
-        // Fetch: fetch an instruction from myInsMem.
-        auto instruction = myInsMem.ReadMemory(PC);
-        PC += 4;
+    while (PC < MemSize) {
+        // Fetch:
+        //     Fetch an instruction from myInsMem.
+        dout << debug::bg::cyan << " INST " << debug::reset
+             << "PC=" << setfill('0') << setw(5) << right << PC << endl;
+        std::cout.copyfmt(oldCoutState);
+        const auto instruction_bits = myInsMem.ReadMemory(PC);
 
-        // If current instruction is "11111111111111111111111111111111",
-        // then break; (exit the while loop)
+        // Check HALT:
+        //     If current instruction is "11111111111111111111111111111111",
+        //     then break; (exit the while loop)
+        if (instruction_bits.all()) {
+            break;
+        }
 
-        // decode(Read RF): get opcode and other signals from instruction,
-        // decode instruction
+        // Decode(Read RF):
+        //     Get opcode and other signals from instruction, decode instruction
+        const auto instruction = instruction_bits.to_ulong();
+        const auto opcode = instruction >> 26;
+        const auto rs = (instruction >> 21) & 0x1F;
+        const auto rt = (instruction >> 16) & 0x1F;
+        const auto rd = (instruction >> 11) & 0x1F;
+        const auto shamt = (instruction >> 6) & 0x1F;
+        const auto funct = instruction & 0x3F;
+        const auto imm = instruction & 0xFFFF;
+        const auto jmp_addr = instruction & 0x3FFFFFF;
 
-        // Execute: after decoding, ALU may run and return result
+        myRF.ReadWrite(rs, rt, rd, 0, false);
+        const unsigned sign_extended_imm = (imm ^ 0x8000) - 0x8000;
+        const auto is_r_type = opcode == 0x00;
+        const auto is_j_type = opcode == 0x02;
+        const auto is_i_type = !(is_r_type || is_j_type);
+        const auto is_load = opcode == 0x23;
+        const auto is_store = opcode == 0x2B;
+        const auto is_branch = opcode == 0x04;
 
-        // Read/Write Mem: access data memory (myDataMem)
+        {
+            if (is_r_type) {
+                dout << debug::bg::white << debug::black << "R-type"
+                     << debug::reset << uppercase << " opcode=0x" << hex
+                     << opcode << " rs=" << dec << rs << " rt=" << rt
+                     << " rd=" << rd << " shamt=" << shamt << " funct=0x" << hex
+                     << funct << endl;
+            }
+            if (is_i_type) {
+                dout << debug::bg::white << debug::black << "I-type"
+                     << debug::reset << uppercase << " opcode=0x" << hex
+                     << opcode << " rs=" << dec << rs << " rt=" << rt
+                     << " imm=" << imm << endl;
+            }
+            if (is_j_type) {
+                dout << debug::bg::white << debug::black << "I-type"
+                     << debug::reset << uppercase << " opcode=0x" << opcode
+                     << " addr=" << jmp_addr << endl;
+            }
+            std::cout.copyfmt(oldCoutState);
+        }
 
-        // Write back to RF: some operations may write things to RF
+        // Execute:
+        //     After decoding, ALU may run and return result
+        const auto operand1 = myRF.ReadData1;
+        const auto operand2 = is_i_type ? sign_extended_imm : myRF.ReadData2;
+        const auto alu_ctrl = is_r_type               ? funct & 0x7
+                              : (is_load || is_store) ? 0b001
+                                                      : opcode & 0x7;
+        myALU.ALUOperation(alu_ctrl, operand1, operand2);
+
+        // NOTE: Supports BEQ only
+        const auto will_branch = operand1 == operand2;
+
+        // Read/Write Mem:
+        //     Access data memory (myDataMem)
+        myDataMem.MemoryAccess(myALU.ALUresult, myRF.ReadData2, is_load,
+                               is_store);
+
+        // Write back to RF:
+        //     Some operations may write things to RF
+        // FIXME: TODO: check the WRITE conditions
+        myRF.ReadWrite(rs, rt, is_r_type ? rd : rt,
+                       is_load ? myDataMem.readdata : myALU.ALUresult,
+                       !(is_store || is_branch || is_j_type));
+
+        // Update PC:
+        if (is_j_type) {
+            PC = ((PC + 4) & (0xF << 28)) | (jmp_addr << 2);
+        } else if (is_branch && will_branch) {
+            PC += 4 + (sign_extended_imm << 2);
+        } else {
+            PC += 4;
+        }
+
+        dout << "---------------" << endl;
 
         /**** You don't need to modify the following lines. ****/
         myRF.OutputRF();  // dump RF;
