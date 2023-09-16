@@ -171,7 +171,7 @@ class ALU {
                 break;
             }
             case 7: {  // nor
-                ALUresult = oprand1 ^ oprand2;
+                ALUresult = ~(oprand1 | oprand2);
                 break;
             }
             default: {
