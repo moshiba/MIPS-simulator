@@ -15,7 +15,7 @@ decoder_regex = re.compile(
     r")"  #       instruction
     r"(?:[ ]+(?P<operand1>\w+))?"  #     operand-1 (optional)
     r"(?:[ ]+(?P<operand2>\w+))?"  #     operand-2 (optional)
-    r"(?:[ ]+(?P<operand3>[-\w]+))?"  #  operand-3 (optional)
+    r"(?:[ ]+(?P<operand3>-?\w+))?"  #   operand-3 (optional)
     r"[ ]*(?P<inline_comment>#.*)?$)"  # in-line comment (optional)
     # Type: Comment line
     r"|(?:^(?P<comment_line>[ ]*?#.*)$)"
