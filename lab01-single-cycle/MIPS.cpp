@@ -104,6 +104,7 @@ class RF {
         if (WrtEnable == 1) {
             auto reg_idx = WrtReg.to_ulong();
             Registers[reg_idx] = WrtData;
+            Registers[0] = 0;  // $zero is wired to zero
 
             dout << debug::bg::red << " WRITE " << debug::reset << "R"
                  << reg_idx << "=" << WrtData << endl;
@@ -386,10 +387,12 @@ int main() {
         const auto alu_ctrl = is_r_type               ? funct & 0x7
                               : (is_load || is_store) ? 0b001
                                                       : opcode & 0x7;
-        myALU.ALUOperation(alu_ctrl, operand1, operand2);
+        if (!is_j_type) {
+            myALU.ALUOperation(alu_ctrl, operand1, operand2);
+        }
 
         // NOTE: Supports BEQ only
-        const auto will_branch = operand1 == operand2;
+        const auto will_branch = myRF.ReadData1 == myRF.ReadData2;
 
         // Read/Write Mem:
         //     Access data memory (myDataMem)
