@@ -1,5 +1,9 @@
+CXXFLAGS = -Wall -std=c++17 -Wc++17-compat -Wc++17-compat-pedantic -Wc++17-extensions
+
 mips: MIPS.cpp
-	g++ -Wall -std=c++17 -Wc++17-compat -Wc++17-compat-pedantic -Wc++17-extensions MIPS.cpp -o MIPS.out
+	g++ ${CXXFLAGS} MIPS.cpp -o MIPS.out
+debug: MIPS.cpp
+	g++ -DDEBUG ${CXXFLAGS} MIPS.cpp -o MIPS.out
 run:
 	./MIPS.out
 verify:
