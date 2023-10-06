@@ -239,16 +239,29 @@ int main() {
     INSMem myInsMem;
     DataMem myDataMem;
 
+    stateStruct state;
+    stateStruct newState;
+
     while (1) {
         /* --------------------- WB stage --------------------- */
+        if (state.WB.wrt_enable) {
+            myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
+        }
 
         /* --------------------- MEM stage --------------------- */
+        if (state.MEM.rd_mem) {
+            myDataMem.readDataMem(state.MEM.ALUresult);
+        }
+        if (state.MEM.wrt_mem) {
+            myDataMem.writeDataMem(state.MEM.ALUresult, state.MEM.Store_data);
+        }
 
         /* --------------------- EX stage --------------------- */
 
         /* --------------------- ID stage --------------------- */
 
         /* --------------------- IF stage --------------------- */
+        // TODO: update PC
 
         if (state.IF.nop && state.ID.nop && state.EX.nop && state.MEM.nop &&
             state.WB.nop)
