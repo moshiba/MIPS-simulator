@@ -234,34 +234,104 @@ void printState(stateStruct state, int cycle) {
     printstate.close();
 }
 
+bool is_jtype(bitset< 32 > instruction) {
+    const bitset< 32 > opcode = instruction >> 26;
+    if (instruction == 0x02) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 int main() {
     RF myRF;
     INSMem myInsMem;
     DataMem myDataMem;
 
     stateStruct state;
-    stateStruct newState;
+    state.IF.nop = 0;
+    state.IF.PC = 0;
+    state.ID.nop = 1;
+    state.EX.nop = 1;
+    state.MEM.nop = 1;
+    state.WB.nop = 1;
+    stateStruct newState = state;
+    int cycle = 0;
 
     while (1) {
         /* --------------------- WB stage --------------------- */
-        if (state.WB.wrt_enable) {
-            myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
-        }
 
         /* --------------------- MEM stage --------------------- */
-        if (state.MEM.rd_mem) {
-            myDataMem.readDataMem(state.MEM.ALUresult);
-        }
-        if (state.MEM.wrt_mem) {
-            myDataMem.writeDataMem(state.MEM.ALUresult, state.MEM.Store_data);
-        }
 
         /* --------------------- EX stage --------------------- */
+        newState.EX.nop = state.ID.nop;
+        if (state.ID.nop == 0) {
+            const bitset< 5 > opcode =
+                bitset< 5 >(state.ID.Instr.to_ullong() >> 26);
+            const bitset< 6 > funct =
+                bitset< 6 >(state.ID.Instr.to_ullong() & 0x3F);
+            if (opcode == 0x0) {
+                newState.EX.is_I_type = 0;
+                newState.EX.rd_mem = 0;
+                newState.EX.wrt_mem = 0;
+                newState.EX.wrt_enable = 1;
+                if (funct == 0x23) {
+                    newState.EX.alu_op = 0;  // subu
+                } else {
+                    newState.EX.alu_op = 1;  // addu
+                }
+            } else if (opcode != 0x4) {  // not beq
+                newState.EX.is_I_type = 1;
+                newState.EX.alu_op = 1;
+                if (opcode == 0x23) {  // lw
+                    newState.EX.rd_mem = 1;
+                    newState.EX.wrt_mem = 0;
+                    newState.EX.wrt_enable = 1;
+                } else if (opcode == 0x2B) {  // sw
+                    newState.EX.rd_mem = 0;
+                    newState.EX.wrt_mem = 1;
+                    newState.EX.wrt_enable = 0;
+                }
+            } else if (opcode == 0x4) {  // beq
+                newState.EX.is_I_type = 1;
+                newState.EX.alu_op = 0;
+                newState.EX.rd_mem = 0;
+                newState.EX.wrt_mem = 0;
+                newState.EX.wrt_enable = 0;
+            } else {
+                cout << "Opcode not accounted for" << endl;
+            }
+
+            if ((opcode != 0x2) && (opcode != 0x3)) {  // not a j-type
+                newState.EX.Rs =
+                    bitset< 5 >((state.ID.Instr.to_ullong() >> 21) & 0x1F);
+                newState.EX.Rt =
+                    bitset< 5 >((state.ID.Instr.to_ullong() >> 16) & 0x1F);
+                newState.EX.Read_data1 = myRF.readRF(newState.EX.Rs);
+                newState.EX.Read_data2 = myRF.readRF(newState.EX.Rt);
+                newState.EX.Imm =
+                    bitset< 16 >((state.ID.Instr.to_ullong() & 0xFFFF));
+                if (newState.EX.is_I_type == 1) {
+                    newState.EX.Wrt_reg_addr = newState.EX.Rt;
+                    // Rt is the destination register for I-type
+                } else {
+                    newState.EX.Wrt_reg_addr =
+                        bitset< 5 >((state.ID.Instr.to_ullong() >> 11) & 0x1F);
+                    // Rd is the destination register for R-type
+                }
+            }
+        }
 
         /* --------------------- ID stage --------------------- */
+        newState.ID.nop = state.IF.nop;
+        if (state.IF.nop == 0) {
+            newState.IF.PC =
+                bitset< 32 >(state.IF.PC.to_ullong() + 4);  // PC = PC + 4
+            newState.ID.Instr =
+                myInsMem.readInstr(state.IF.PC);  // read from imem
+        }
 
         /* --------------------- IF stage --------------------- */
-        // TODO: update PC
 
         if (state.IF.nop && state.ID.nop && state.EX.nop && state.MEM.nop &&
             state.WB.nop)
