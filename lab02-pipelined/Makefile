@@ -4,6 +4,8 @@ mips: MIPS_pipeline.cpp
 	g++ ${CXXFLAGS} MIPS_pipeline.cpp -o MIPS_pipeline.out
 debug: MIPS_pipeline.cpp
 	g++ -DDEBUG ${CXXFLAGS} MIPS_pipeline.cpp -o MIPS_pipeline.out
+run:
+	./MIPS_pipeline.out
 verify:
 	diff RFresult.txt expected_results/RFresult.txt
 	diff dmemresult.txt expected_results/dmemresult.txt
