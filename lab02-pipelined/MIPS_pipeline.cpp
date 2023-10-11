@@ -280,16 +280,64 @@ int main()
     while (1) {
 
         /* --------------------- WB stage --------------------- */
-
-
+        if(state.WB.nop == 0){
+            if(state.WB.wrt_enable){
+                myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
+            }
+        }
 
         /* --------------------- MEM stage --------------------- */
-      
+        newState.WB.nop = state.MEM.nop;
+        if(newState.WB.nop == 0){
+            if(state.MEM.rd_mem){ //lw
+                newState.WB.Wrt_data = myDataMem.readDataMem(state.MEM.ALUresult);
+            }
+            if(state.MEM.wrt_mem){ //sw
+                myDataMem.writeDataMem(state.MEM.ALUresult, state.MEM.Store_data);
+            }
+            newState.WB.Rs = state.MEM.Rs;
+            newState.WB.Rt = state.MEM.Rt;
+            newState.WB.Wrt_reg_addr = state.MEM.Wrt_reg_addr;
+            newState.WB.wrt_enable = state.MEM.wrt_enable;
+        }
 
 
         /* --------------------- EX stage --------------------- */
+        newState.MEM.nop = state.EX.nop;
+        if(newState.MEM.nop == 0){
+            if(state.EX.alu_op){
+                //addition
+                if(state.EX.is_I_type){
+                    //I type
+                    newState.MEM.ALUresult = bitset<32> (state.EX.Read_data1.to_ullong() + 
+                                                state.EX.Imm.to_ullong());
+                }
+                else{
+                    //R type
+                    newState.MEM.ALUresult = bitset<32> (state.EX.Read_data1.to_ullong() + 
+                                                state.EX.Read_data2.to_ullong());
+                }
+            }
+            else{
+                //subtraction
+                newState.MEM.ALUresult = bitset<32> (state.EX.Read_data1.to_ullong() - 
+                                            state.EX.Read_data2.to_ullong());
+            }
+            if(state.EX.wrt_mem){
+                newState.MEM.Store_data = state.EX.Read_data2;
+            }
+            newState.MEM.Rs = state.EX.Rs;
+            newState.MEM.Rt = state.EX.Rt;
+            newState.MEM.Wrt_reg_addr = state.EX.Wrt_reg_addr;
+            newState.MEM.wrt_enable = state.EX.wrt_enable;
+            newState.MEM.rd_mem = state.EX.rd_mem;
+            newState.MEM.wrt_mem = state.EX.wrt_mem;
+        }
+
+
+        /* --------------------- ID stage --------------------- */
         newState.EX.nop = state.ID.nop;
-        if(state.ID.nop == 0){
+        if(newState.EX.nop == 0){
             const bitset<5> opcode = bitset<5>(state.ID.Instr.to_ullong() >> 26);
             const bitset<6> funct = bitset<6>(state.ID.Instr.to_ullong() & 0x3F);
             if(opcode == 0x0){
@@ -345,19 +393,20 @@ int main()
                 }
             }
         }
-          
-
-        /* --------------------- ID stage --------------------- */
-        newState.ID.nop = state.IF.nop;
-        if(state.IF.nop == 0){
-            newState.IF.PC = bitset<32>(state.IF.PC.to_ullong()+4); //PC = PC + 4
-            newState.ID.Instr = myInsMem.readInstr(state.IF.PC); //read from imem
-        }
 
         
         /* --------------------- IF stage --------------------- */
+        newState.ID.nop = state.IF.nop;
+        if(newState.ID.nop == 0){
+            newState.IF.PC = bitset<32>(state.IF.PC.to_ullong()+4); //PC = PC + 4
+            newState.ID.Instr = myInsMem.readInstr(state.IF.PC); //read from imem
+            if(newState.ID.Instr == 0xFFFFFFFF){ //check for halt
+                newState.ID.nop = 1;
+            }
+        }
 
-             
+
+        //////////////////////////////////////////////////////////     
         if (state.IF.nop && state.ID.nop && state.EX.nop && state.MEM.nop && state.WB.nop)
             break;
         
