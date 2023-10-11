@@ -260,8 +260,22 @@ int main() {
 
     while (1) {
         /* --------------------- WB stage --------------------- */
+        if (state.WB.nop == 0) {
+            if (state.WB.wrt_enable) {
+                myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
+            }
+        }
 
         /* --------------------- MEM stage --------------------- */
+        if (state.MEM.nop == 0) {
+            if (state.MEM.rd_mem) {
+                myDataMem.readDataMem(state.MEM.ALUresult);
+            }
+            if (state.MEM.wrt_mem) {
+                myDataMem.writeDataMem(state.MEM.ALUresult,
+                                       state.MEM.Store_data);
+            }
+        }
 
         /* --------------------- EX stage --------------------- */
         newState.EX.nop = state.ID.nop;
