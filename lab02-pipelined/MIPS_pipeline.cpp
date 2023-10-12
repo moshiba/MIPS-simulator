@@ -318,6 +318,8 @@ int main() {
     stateStruct newState = state;
     int cycle = 0;
 
+    bool control_hazard_flag = 0;
+
     while (1) {
         dout << "cycle " << cycle << std::endl;
         /* --------------------- WB stage --------------------- */
@@ -345,7 +347,6 @@ int main() {
 
 
         /* --------------------- EX stage --------------------- */
-<<<<<<< HEAD
         newState.MEM.nop = state.EX.nop;
         if(newState.MEM.nop == 0){
             if(state.EX.alu_op){
@@ -393,7 +394,7 @@ int main() {
                 } else {
                     newState.EX.alu_op = 1;  // addu
                 }
-            } else if (opcode != 0x4) {  // not beq
+            } else if (opcode != 0x4) {  // not bne
                 newState.EX.is_I_type = 1;
                 newState.EX.alu_op = 1;
                 if (opcode == 0x23) {  // lw
@@ -405,7 +406,7 @@ int main() {
                     newState.EX.wrt_mem = 1;
                     newState.EX.wrt_enable = 0;
                 }
-            } else if (opcode == 0x4) {  // beq
+            } else if (opcode == 0x4) {  // bne
                 newState.EX.is_I_type = 1;
                 newState.EX.alu_op = 0;
                 newState.EX.rd_mem = 0;
@@ -433,19 +434,24 @@ int main() {
                     // Rd is the destination register for R-type
                 }
             }
-        }
-
-        /* --------------------- ID stage --------------------- */
-        newState.ID.nop = state.IF.nop;
-        if (state.IF.nop == 0) {
-            newState.IF.PC =
-                bitset< 32 >(state.IF.PC.to_ullong() + 4);  // PC = PC + 4
-            newState.ID.Instr =
-                myInsMem.readInstr(state.IF.PC);  // read from imem
+            if(opcode == 0x4){ //bne
+                if(newState.EX.Read_data1 != newState.EX.Read_data2){
+                    newState.IF.PC = state.IF.PC.to_ullong() + 
+                    (newState.EX.Imm.to_ullong() << 2);
+                    newState.ID.nop = 1;
+                    control_hazard_flag = 1;
+                }
+                //else do nothing
+            }
         }
 
         /* --------------------- IF stage --------------------- */
-        newState.ID.nop = state.IF.nop;
+        if(control_hazard_flag){
+            newState.ID.nop = 1;
+        }
+        else{
+            newState.ID.nop = state.IF.nop;
+        }
         if(newState.ID.nop == 0){
             newState.IF.PC = bitset<32>(state.IF.PC.to_ullong()+4); //PC = PC + 4
             newState.ID.Instr = myInsMem.readInstr(state.IF.PC); //read from imem
@@ -465,6 +471,8 @@ int main() {
         state =
             newState; /*** The end of the cycle and updates the current state
                          with the values calculated in this cycle. csa23 ***/
+        control_hazard_flag = 0;
+        ++cycle;
     }
 
     myRF.outputRF();            // dump RF;
