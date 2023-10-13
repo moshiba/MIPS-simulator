@@ -379,10 +379,10 @@ int main() {
 
         /* --------------------- ID stage --------------------- */
         {
+            const auto instruction = state.ID.Instr.to_ulong();
+            const auto opcode = instruction >> 26;
             newState.EX.nop = state.ID.nop;
             if (newState.EX.nop == 0) {
-                const bitset< 5 > opcode =
-                    bitset< 5 >(state.ID.Instr.to_ullong() >> 26);
                 const bitset< 6 > funct =
                     bitset< 6 >(state.ID.Instr.to_ullong() & 0x3F);
 
