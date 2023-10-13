@@ -433,23 +433,25 @@ int main() {
             dout << "----------------\nID\n";
             const unsigned instruction = state.ID.Instr.to_ulong();
             const unsigned opcode = instruction >> 26;
+            const unsigned rs = (instruction >> 21) & 0x1F;
+            const unsigned rt = (instruction >> 16) & 0x1F;
+            const unsigned rd = (instruction >> 11) & 0x1F;
             const unsigned funct = instruction & 0x3F;
-            const unsigned is_r_type = opcode == 0x00;
+            const unsigned imm = instruction & 0xFFFF;
+            const bool is_empty = state.ID.Instr.none();
+            const bool is_r_type = opcode == 0x00;
             // The only J-type here is HALT
-            const unsigned is_j_type = opcode == 0x3F;
-            const unsigned is_i_type = !(is_r_type || is_j_type);
+            const bool is_j_type = opcode == 0x3F;
+            const bool is_i_type = !(is_r_type || is_j_type);
+            const bool is_load = opcode == 0x23;
+            const bool is_store = opcode == 0x2B;
+            const bool is_branch = opcode == 0x04;
+
             {
-                const unsigned rs = (instruction >> 21) & 0x1F;
-                const unsigned rt = (instruction >> 16) & 0x1F;
-                const unsigned rd = (instruction >> 11) & 0x1F;
                 const unsigned shamt = (instruction >> 6) & 0x1F;
-                const unsigned imm = instruction & 0xFFFF;
                 const unsigned jmp_addr = instruction & 0x3FFFFFF;
 
                 // const unsigned sign_extended_imm = (imm ^ 0x8000) - 0x8000;
-                // const auto is_load = opcode == 0x23;
-                // const auto is_store = opcode == 0x2B;
-                // const auto is_branch = opcode == 0x04;
 
                 if (is_r_type) {
                     dout << debug::bg::white << debug::black << "R-type"
@@ -473,66 +475,23 @@ int main() {
             }
 
             newState.EX.nop = state.ID.nop;
-            if (newState.EX.nop == 0) {
-                if (opcode == 0x0) {
-                    newState.EX.is_I_type = 0;
-                    newState.EX.rd_mem = 0;
-                    newState.EX.wrt_mem = 0;
-                    newState.EX.wrt_enable = 1;
-                    if (funct == 0x23) {
-                        newState.EX.alu_op = 0;  // subu
-                    } else {
-                        newState.EX.alu_op = 1;  // addu
-                    }
-                } else if (opcode != 0x4) {  // not bne
-                    newState.EX.is_I_type = 1;
-                    newState.EX.alu_op = 1;
-                    if (opcode == 0x23) {  // lw
-                        newState.EX.rd_mem = 1;
-                        newState.EX.wrt_mem = 0;
-                        newState.EX.wrt_enable = 1;
-                    } else if (opcode == 0x2B) {  // sw
-                        newState.EX.rd_mem = 0;
-                        newState.EX.wrt_mem = 1;
-                        newState.EX.wrt_enable = 0;
-                    }
-                } else if (opcode == 0x5) {  // bne
-                    newState.EX.is_I_type = 1;
-                    newState.EX.alu_op = 0;
-                    newState.EX.rd_mem = 0;
-                    newState.EX.wrt_mem = 0;
-                    newState.EX.wrt_enable = 0;
-                } else {
-                    throw runtime_error("Opcode not accounted for");
-                }
 
-                if ((opcode != 0x2) && (opcode != 0x3)) {  // not a j-type
-                    newState.EX.Rs =
-                        bitset< 5 >((state.ID.Instr.to_ullong() >> 21) & 0x1F);
-                    newState.EX.Rt =
-                        bitset< 5 >((state.ID.Instr.to_ullong() >> 16) & 0x1F);
-                    newState.EX.Read_data1 = myRF.readRF(newState.EX.Rs);
-                    newState.EX.Read_data2 = myRF.readRF(newState.EX.Rt);
-                    newState.EX.Imm =
-                        bitset< 16 >((state.ID.Instr.to_ullong() & 0xFFFF));
-                    if (newState.EX.is_I_type == 1) {
-                        newState.EX.Wrt_reg_addr = newState.EX.Rt;
-                        // Rt is the destination register for I-type
-                    } else {
-                        newState.EX.Wrt_reg_addr = bitset< 5 >(
-                            (state.ID.Instr.to_ullong() >> 11) & 0x1F);
-                        // Rd is the destination register for R-type
-                    }
+            if (newState.EX.nop == 0) {
+                if (is_r_type || is_i_type) {
+                    newState.EX.Rs = rs;
+                    newState.EX.Rt = rt;
                 }
-                if (opcode == 0x4) {  // bne
-                    if (newState.EX.Read_data1 != newState.EX.Read_data2) {
-                        newState.IF.PC = state.IF.PC.to_ullong() +
-                                         (newState.EX.Imm.to_ullong() << 2);
-                        newState.ID.nop = 1;
-                        control_hazard_flag = 1;
-                    }
-                    // else do nothing
+                newState.EX.Read_data1 = myRF.readRF(newState.EX.Rs);
+                newState.EX.Read_data2 = myRF.readRF(newState.EX.Rt);
+                newState.EX.wrt_enable = !is_empty && (is_r_type || is_load);
+                if (newState.EX.wrt_enable) {
+                    newState.EX.Wrt_reg_addr = is_r_type ? rd : rt;
                 }
+                newState.EX.alu_op = !(opcode == 0 && funct == 0x23);
+                newState.EX.is_I_type = is_i_type;
+                newState.EX.rd_mem = is_load;
+                newState.EX.wrt_mem = is_store;
+                newState.EX.Imm = imm;
             }
         }
 
