@@ -375,7 +375,9 @@ int main() {
         /* --------------------- MEM stage --------------------- */
         {
             dout << "----------------\nMEM\n";
+
             newState.WB.nop = state.MEM.nop;
+
             if (newState.WB.nop == 0) {
                 if (state.MEM.rd_mem) {  // lw
                     newState.WB.Wrt_data =
