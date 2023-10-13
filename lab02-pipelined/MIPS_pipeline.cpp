@@ -343,12 +343,23 @@ int main() {
     DataMem myDataMem;
 
     stateStruct state;
-    state.IF.PC = 0;
-    state.IF.nop = 0;
-    state.ID.nop = 1;
-    state.EX.nop = 1;
-    state.MEM.nop = 1;
-    state.WB.nop = 1;
+    {  // IF
+        state.IF.PC = 0;
+        state.IF.nop = 0;
+    }
+    {  // ID
+        state.ID.nop = 1;
+    }
+    {  // EX
+        state.EX.nop = 1;
+        state.EX.alu_op = 1;
+    }
+    {  // MEM
+        state.MEM.nop = 1;
+    }
+    {  // WB
+        state.WB.nop = 1;
+    }
     stateStruct newState = state;
     int cycle = 0;
 
