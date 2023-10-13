@@ -408,7 +408,7 @@ int main() {
                         newState.EX.wrt_mem = 1;
                         newState.EX.wrt_enable = 0;
                     }
-                } else if (opcode == 0x4) {  // bne
+                } else if (opcode == 0x5) {  // bne
                     newState.EX.is_I_type = 1;
                     newState.EX.alu_op = 0;
                     newState.EX.rd_mem = 0;
