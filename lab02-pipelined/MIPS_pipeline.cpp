@@ -395,30 +395,27 @@ int main() {
         /* --------------------- EX stage --------------------- */
         {
             dout << "----------------\nEX\n";
+
+            const unsigned operand1 = state.EX.Read_data1.to_ulong();
+            const uint32_t sign_extended_imm =
+                (state.EX.Imm.to_ulong() ^ 0x8000) - 0x8000;
+            const unsigned operand2 = state.EX.is_I_type
+                                          ? sign_extended_imm
+                                          : state.EX.Read_data2.to_ulong();
+
             newState.MEM.nop = state.EX.nop;
+
             if (newState.MEM.nop == 0) {
                 if (state.EX.alu_op) {
-                    // addition
-                    if (state.EX.is_I_type) {
-                        // I type
-                        newState.MEM.ALUresult =
-                            bitset< 32 >(state.EX.Read_data1.to_ullong() +
-                                         state.EX.Imm.to_ullong());
-                    } else {
-                        // R type
-                        newState.MEM.ALUresult =
-                            bitset< 32 >(state.EX.Read_data1.to_ullong() +
-                                         state.EX.Read_data2.to_ullong());
-                    }
+                    newState.MEM.ALUresult = operand1 + operand2;
                 } else {
-                    // subtraction
-                    newState.MEM.ALUresult =
-                        bitset< 32 >(state.EX.Read_data1.to_ullong() -
-                                     state.EX.Read_data2.to_ullong());
+                    newState.MEM.ALUresult = operand1 - operand2;
                 }
+
                 if (state.EX.wrt_mem) {
                     newState.MEM.Store_data = state.EX.Read_data2;
                 }
+
                 newState.MEM.Rs = state.EX.Rs;
                 newState.MEM.Rt = state.EX.Rt;
                 newState.MEM.Wrt_reg_addr = state.EX.Wrt_reg_addr;
