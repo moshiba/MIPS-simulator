@@ -539,14 +539,11 @@ int main() {
         /* --------------------- IF stage --------------------- */
         {
             dout << "----------------\nIF\n";
-            if (control_hazard_flag) {
-                newState.ID.nop = 1;
-            } else {
-                newState.ID.nop = state.IF.nop;
-            }
+
+            newState.ID.nop = control_hazard_flag ? 1 : state.IF.nop;
+
             if (newState.ID.nop == 0) {
-                newState.IF.PC =
-                    bitset< 32 >(state.IF.PC.to_ullong() + 4);  // PC = PC + 4
+                newState.IF.PC = state.IF.PC.to_ullong() + 4;  // PC = PC + 4
                 newState.ID.Instr =
                     myInsMem.readInstr(state.IF.PC);  // read from imem
 
