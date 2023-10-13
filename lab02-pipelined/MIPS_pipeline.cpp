@@ -527,9 +527,9 @@ int main() {
         /* --------------------- IF stage --------------------- */
         {
             dout << "----------------\nIF\n";
+            dout << " PC: " << state.IF.PC.to_ulong() << endl;
 
             if (!state.IF.nop && !freeze_if) {
-                newState.IF.PC = state.IF.PC.to_ulong() + 4;  // PC = PC + 4
                 newState.ID.Instr =
                     myInsMem.readInstr(state.IF.PC);  // read from imem
 
@@ -542,7 +542,9 @@ int main() {
                          << endl;
 
                     newState.IF.nop = 1;
-                    newState.ID.nop = 1;
+                    freeze_if = 1;  // newState.ID.nop = 1; will get overwritten
+                } else {
+                    newState.IF.PC = state.IF.PC.to_ulong() + 4;  // PC = PC + 4
                 }
             }
 
