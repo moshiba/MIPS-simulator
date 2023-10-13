@@ -431,10 +431,8 @@ int main() {
                     newState.MEM.ALUresult = operand1 - operand2;
                 }
 
-                if (state.EX.wrt_mem) {
-                    newState.MEM.Store_data = state.EX.Read_data2;
-                }
-
+                // if (state.EX.wrt_mem) { DON'T CARE
+                newState.MEM.Store_data = state.EX.Read_data2;
                 newState.MEM.Rs = state.EX.Rs;
                 newState.MEM.Rt = state.EX.Rt;
                 newState.MEM.Wrt_reg_addr = state.EX.Wrt_reg_addr;
@@ -499,9 +497,8 @@ int main() {
                 newState.EX.Read_data1 = myRF.readRF(newState.EX.Rs);
                 newState.EX.Read_data2 = myRF.readRF(newState.EX.Rt);
                 newState.EX.wrt_enable = !is_bubble && (is_r_type || is_load);
-                if (newState.EX.wrt_enable) {
-                    newState.EX.Wrt_reg_addr = is_r_type ? rd : rt;
-                }
+                // if (newState.EX.wrt_enable) { DON'T CARE
+                newState.EX.Wrt_reg_addr = is_r_type ? rd : rt;
                 newState.EX.alu_op =
                     !(is_r_type && funct == 0x23);  // statement: (not 'subu')
                 newState.EX.is_I_type = is_i_type;
