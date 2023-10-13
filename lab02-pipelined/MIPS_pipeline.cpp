@@ -392,6 +392,8 @@ int main() {
                 if (state.MEM.rd_mem) {  // lw
                     newState.WB.Wrt_data =
                         myDataMem.readDataMem(state.MEM.ALUresult);
+                } else {
+                    newState.WB.Wrt_data = state.MEM.ALUresult;
                 }
                 if (state.MEM.wrt_mem) {  // sw
                     myDataMem.writeDataMem(state.MEM.ALUresult,
