@@ -456,7 +456,7 @@ int main() {
             const bool is_i_type = !(is_r_type || is_j_type);
             const bool is_load = opcode == 0x23;
             const bool is_store = opcode == 0x2B;
-            const bool is_branch = opcode == 0x04;
+            const bool is_branch = opcode == 0x05;
 
             {
                 const unsigned shamt = (instruction >> 6) & 0x1F;
@@ -494,7 +494,8 @@ int main() {
                 if (newState.EX.wrt_enable) {
                     newState.EX.Wrt_reg_addr = is_r_type ? rd : rt;
                 }
-                newState.EX.alu_op = !(opcode == 0 && funct == 0x23);
+                newState.EX.alu_op =
+                    !(is_r_type && funct == 0x23);  // statement: (not 'subu')
                 newState.EX.is_I_type = is_i_type;
                 newState.EX.rd_mem = is_load;
                 newState.EX.wrt_mem = is_store;
