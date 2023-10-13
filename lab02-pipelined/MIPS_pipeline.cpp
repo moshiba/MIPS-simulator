@@ -410,13 +410,19 @@ int main() {
         {
             dout << "----------------\nEX\n";
 
-            const unsigned operand1 = state.EX.Read_data1.to_ulong();
-            const uint32_t sign_extended_imm = state.EX.Imm.to_ulong();
-            const unsigned operand2 = state.EX.is_I_type
-                                          ? sign_extended_imm
-                                          : state.EX.Read_data2.to_ulong();
-
             if (!state.EX.nop) {
+                const bool forward_rs = state.WB.Wrt_reg_addr == state.EX.Rs;
+                const bool forward_rt = state.WB.Wrt_reg_addr == state.EX.Rt;
+
+                const unsigned operand1 = forward_rs
+                                              ? state.WB.Wrt_data.to_ulong()
+                                              : state.EX.Read_data1.to_ulong();
+                const unsigned operand2 =
+                    forward_rt
+                        ? state.WB.Wrt_data.to_ulong()
+                        : (state.EX.is_I_type ? state.EX.Imm.to_ulong()
+                                              : state.EX.Read_data2.to_ulong());
+
                 if (state.EX.alu_op) {
                     newState.MEM.ALUresult = operand1 + operand2;
                 } else {
