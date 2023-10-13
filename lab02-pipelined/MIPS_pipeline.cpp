@@ -365,6 +365,7 @@ int main() {
         /* --------------------- WB stage --------------------- */
         {
             dout << "----------------\nWB\n";
+
             if (state.WB.nop == 0) {
                 if (state.WB.wrt_enable) {
                     myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
