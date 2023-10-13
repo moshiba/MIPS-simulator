@@ -294,15 +294,6 @@ void printState(stateStruct state, int cycle) {
     printstate.close();
 }
 
-bool is_jtype(bitset< 32 > instruction) {
-    const bitset< 32 > opcode = instruction >> 26;
-    if (instruction == 0x02) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
 int main() {
     RF myRF;
     INSMem myInsMem;
