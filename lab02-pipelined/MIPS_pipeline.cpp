@@ -1,4 +1,5 @@
 #include <bitset>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -415,7 +416,7 @@ int main() {
                     newState.EX.wrt_mem = 0;
                     newState.EX.wrt_enable = 0;
                 } else {
-                    cout << "Opcode not accounted for" << endl;
+                    throw runtime_error("Opcode not accounted for");
                 }
 
                 if ((opcode != 0x2) && (opcode != 0x3)) {  // not a j-type
