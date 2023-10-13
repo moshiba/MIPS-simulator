@@ -363,8 +363,6 @@ int main() {
     stateStruct newState = state;
     int cycle = 0;
 
-    bool control_hazard_flag = 0;
-
     while (1) {
         dout << "\n"
                 "================================"
@@ -372,6 +370,8 @@ int main() {
                 "\n"
                 "cycle "
              << cycle << std::endl;
+
+        bool freeze_if = 0;
 
         /* --------------------- WB stage --------------------- */
         {
@@ -500,6 +500,17 @@ int main() {
                 newState.EX.rd_mem = is_load;
                 newState.EX.wrt_mem = is_store;
                 newState.EX.Imm = sign_extended_imm;
+
+                if (is_branch) {  // BNE
+                    const unsigned relative_addr = sign_extended_imm << 2;
+                    const bool branch_taken =
+                        newState.EX.Read_data1 != newState.EX.Read_data2;
+
+                    if (branch_taken) {
+                        state.IF.PC = state.IF.PC.to_ulong() + relative_addr;
+                        freeze_if = 1;
+                    }
+                }
             }
 
             newState.EX.nop = state.ID.nop;
@@ -509,8 +520,8 @@ int main() {
         {
             dout << "----------------\nIF\n";
 
-            if (!control_hazard_flag && !state.IF.nop) {
-                newState.IF.PC = state.IF.PC.to_ullong() + 4;  // PC = PC + 4
+            if (!state.IF.nop && !freeze_if) {
+                newState.IF.PC = state.IF.PC.to_ulong() + 4;  // PC = PC + 4
                 newState.ID.Instr =
                     myInsMem.readInstr(state.IF.PC);  // read from imem
 
@@ -527,7 +538,7 @@ int main() {
                 }
             }
 
-            newState.ID.nop = state.IF.nop || control_hazard_flag;
+            newState.ID.nop = state.IF.nop || freeze_if;
         }
 
         //////////////////////////////////////////////////////////
@@ -570,7 +581,6 @@ int main() {
         /* The end of the cycle
          * updates the current state with the values calculated in this cycle.
          */
-        control_hazard_flag = 0;
         ++cycle;
     }
 
