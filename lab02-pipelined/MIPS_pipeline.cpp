@@ -371,7 +371,7 @@ int main() {
         {
             dout << "----------------\nWB\n";
 
-            if (state.WB.nop == 0) {
+            if (!state.WB.nop) {
                 if (state.WB.wrt_enable) {
                     myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
                 }
@@ -382,9 +382,7 @@ int main() {
         {
             dout << "----------------\nMEM\n";
 
-            newState.WB.nop = state.MEM.nop;
-
-            if (newState.WB.nop == 0) {
+            if (!state.MEM.nop) {
                 if (state.MEM.rd_mem) {  // lw
                     newState.WB.Wrt_data =
                         myDataMem.readDataMem(state.MEM.ALUresult);
@@ -398,6 +396,8 @@ int main() {
                 newState.WB.Wrt_reg_addr = state.MEM.Wrt_reg_addr;
                 newState.WB.wrt_enable = state.MEM.wrt_enable;
             }
+
+            newState.WB.nop = state.MEM.nop;
         }
 
         /* --------------------- EX stage --------------------- */
@@ -411,9 +411,7 @@ int main() {
                                           ? sign_extended_imm
                                           : state.EX.Read_data2.to_ulong();
 
-            newState.MEM.nop = state.EX.nop;
-
-            if (newState.MEM.nop == 0) {
+            if (!state.EX.nop) {
                 if (state.EX.alu_op) {
                     newState.MEM.ALUresult = operand1 + operand2;
                 } else {
@@ -431,6 +429,8 @@ int main() {
                 newState.MEM.rd_mem = state.EX.rd_mem;
                 newState.MEM.wrt_mem = state.EX.wrt_mem;
             }
+
+            newState.MEM.nop = state.EX.nop;
         }
 
         /* --------------------- ID stage --------------------- */
@@ -479,9 +479,7 @@ int main() {
                 std::cout.copyfmt(oldCoutState);
             }
 
-            newState.EX.nop = state.ID.nop;
-
-            if (newState.EX.nop == 0) {
+            if (!state.ID.nop) {
                 if (is_r_type || is_i_type) {
                     newState.EX.Rs = rs;
                     newState.EX.Rt = rt;
@@ -498,26 +496,33 @@ int main() {
                 newState.EX.wrt_mem = is_store;
                 newState.EX.Imm = imm;
             }
+
+            newState.EX.nop = state.ID.nop;
         }
 
         /* --------------------- IF stage --------------------- */
         {
             dout << "----------------\nIF\n";
 
-            newState.ID.nop = control_hazard_flag ? 1 : state.IF.nop;
-
-            if (newState.ID.nop == 0) {
+            if (!control_hazard_flag && !state.IF.nop) {
                 newState.IF.PC = state.IF.PC.to_ullong() + 4;  // PC = PC + 4
                 newState.ID.Instr =
                     myInsMem.readInstr(state.IF.PC);  // read from imem
 
                 if (newState.ID.Instr == 0xFFFFFFFF) {  // check for halt
-                    dout << debug::bg::red << "HALT" << debug::reset << endl;
+                    dout << debug::bg::red << "             " << debug::reset
+                         << endl
+                         << debug::bg::red << "    HALT     " << debug::reset
+                         << endl
+                         << debug::bg::red << "             " << debug::reset
+                         << endl;
 
                     newState.IF.nop = 1;
                     newState.ID.nop = 1;
                 }
             }
+
+            newState.ID.nop = state.IF.nop || control_hazard_flag;
         }
 
         //////////////////////////////////////////////////////////
