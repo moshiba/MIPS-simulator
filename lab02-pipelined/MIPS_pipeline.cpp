@@ -135,11 +135,27 @@ class RF {
 
     bitset< 32 > readRF(bitset< 5 > Reg_addr) {
         Reg_data = Registers[Reg_addr.to_ulong()];
+
+        {
+            dout << debug::bg::magenta << " REG  " << debug::bg::blue
+                 << " READ  " << debug::reset << "R" << Reg_addr.to_ulong()
+                 << "=0x" << hex << uppercase << setfill('0') << setw(8)
+                 << Reg_data.to_ulong() << endl;
+            std::cout.copyfmt(oldCoutState);
+        }
+
         return Reg_data;
     }
 
     void writeRF(bitset< 5 > Reg_addr, bitset< 32 > Wrt_reg_data) {
         Registers[Reg_addr.to_ulong()] = Wrt_reg_data;
+
+        {
+            dout << debug::bg::magenta << " REG  " << debug::bg::red
+                 << " WRITE " << debug::reset << "R" << Reg_addr.to_ulong()
+                 << "=" << Wrt_reg_data.to_ulong() << endl;
+            std::cout.copyfmt(oldCoutState);
+        }
     }
 
     void outputRF() {
@@ -185,6 +201,15 @@ class INSMem {
         insmem.append(IMem[ReadAddress.to_ulong() + 2].to_string());
         insmem.append(IMem[ReadAddress.to_ulong() + 3].to_string());
         Instruction = bitset< 32 >(insmem);  // read instruction memory
+
+        {
+            dout << debug::bg::yellow << " IMEM " << debug::bg::blue
+                 << " READ  " << debug::reset << "[" << setfill('0') << setw(5)
+                 << right << ReadAddress.to_ulong() << "]"
+                 << "=" << Instruction << endl;
+            std::cout.copyfmt(oldCoutState);
+        }
+
         return Instruction;
     }
 
@@ -218,6 +243,15 @@ class DataMem {
         datamem.append(DMem[Address.to_ulong() + 2].to_string());
         datamem.append(DMem[Address.to_ulong() + 3].to_string());
         ReadData = bitset< 32 >(datamem);  // read data memory
+
+        {
+            dout << debug::bg::green << " DMEM " << debug::bg::blue << " READ  "
+                 << debug::reset << "[" << setfill('0') << setw(5) << right
+                 << Address.to_ulong() << "]"
+                 << "=" << ReadData << endl;
+            std::cout.copyfmt(oldCoutState);
+        }
+
         return ReadData;
     }
 
@@ -230,6 +264,14 @@ class DataMem {
             bitset< 8 >(WriteData.to_string().substr(16, 8));
         DMem[Address.to_ulong() + 3] =
             bitset< 8 >(WriteData.to_string().substr(24, 8));
+
+        {
+            dout << debug::bg::green << " DMEM " << debug::bg::red << " WRITE "
+                 << debug::reset << "[" << setfill('0') << setw(5) << right
+                 << Address.to_ulong() << "]"
+                 << "=" << WriteData << endl;
+            std::cout.copyfmt(oldCoutState);
+        }
     }
 
     void outputDataMem() {
@@ -313,10 +355,16 @@ int main() {
     bool control_hazard_flag = 0;
 
     while (1) {
-        dout << "cycle " << cycle << std::endl;
+        dout << "\n"
+                "================================"
+                "================================"
+                "\n"
+                "cycle "
+             << cycle << std::endl;
 
         /* --------------------- WB stage --------------------- */
         {
+            dout << "----------------\nWB\n";
             if (state.WB.nop == 0) {
                 if (state.WB.wrt_enable) {
                     myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
@@ -326,6 +374,7 @@ int main() {
 
         /* --------------------- MEM stage --------------------- */
         {
+            dout << "----------------\nMEM\n";
             newState.WB.nop = state.MEM.nop;
             if (newState.WB.nop == 0) {
                 if (state.MEM.rd_mem) {  // lw
@@ -345,6 +394,7 @@ int main() {
 
         /* --------------------- EX stage --------------------- */
         {
+            dout << "----------------\nEX\n";
             newState.MEM.nop = state.EX.nop;
             if (newState.MEM.nop == 0) {
                 if (state.EX.alu_op) {
@@ -380,13 +430,50 @@ int main() {
 
         /* --------------------- ID stage --------------------- */
         {
-            const auto instruction = state.ID.Instr.to_ulong();
-            const auto opcode = instruction >> 26;
+            dout << "----------------\nID\n";
+            const unsigned instruction = state.ID.Instr.to_ulong();
+            const unsigned opcode = instruction >> 26;
+            const unsigned funct = instruction & 0x3F;
+            const unsigned is_r_type = opcode == 0x00;
+            // The only J-type here is HALT
+            const unsigned is_j_type = opcode == 0x3F;
+            const unsigned is_i_type = !(is_r_type || is_j_type);
+            {
+                const unsigned rs = (instruction >> 21) & 0x1F;
+                const unsigned rt = (instruction >> 16) & 0x1F;
+                const unsigned rd = (instruction >> 11) & 0x1F;
+                const unsigned shamt = (instruction >> 6) & 0x1F;
+                const unsigned imm = instruction & 0xFFFF;
+                const unsigned jmp_addr = instruction & 0x3FFFFFF;
+
+                // const unsigned sign_extended_imm = (imm ^ 0x8000) - 0x8000;
+                // const auto is_load = opcode == 0x23;
+                // const auto is_store = opcode == 0x2B;
+                // const auto is_branch = opcode == 0x04;
+
+                if (is_r_type) {
+                    dout << debug::bg::white << debug::black << "R-type"
+                         << debug::reset << uppercase << " opcode=0x" << hex
+                         << opcode << " rs=" << dec << rs << " rt=" << rt
+                         << " rd=" << rd << " shamt=" << shamt << " funct=0x"
+                         << hex << funct << endl;
+                }
+                if (is_i_type) {
+                    dout << debug::bg::white << debug::black << "I-type"
+                         << debug::reset << uppercase << " opcode=0x" << hex
+                         << opcode << " rs=" << dec << rs << " rt=" << rt
+                         << " imm=" << imm << endl;
+                }
+                if (is_j_type) {
+                    dout << debug::bg::white << debug::black << "I-type"
+                         << debug::reset << uppercase << " opcode=0x" << opcode
+                         << " addr=" << jmp_addr << endl;
+                }
+                std::cout.copyfmt(oldCoutState);
+            }
+
             newState.EX.nop = state.ID.nop;
             if (newState.EX.nop == 0) {
-                const bitset< 6 > funct =
-                    bitset< 6 >(state.ID.Instr.to_ullong() & 0x3F);
-
                 if (opcode == 0x0) {
                     newState.EX.is_I_type = 0;
                     newState.EX.rd_mem = 0;
@@ -451,6 +538,7 @@ int main() {
 
         /* --------------------- IF stage --------------------- */
         {
+            dout << "----------------\nIF\n";
             if (control_hazard_flag) {
                 newState.ID.nop = 1;
             } else {
@@ -464,6 +552,7 @@ int main() {
 
                 if (newState.ID.Instr == 0xFFFFFFFF) {  // check for halt
                     dout << debug::bg::red << "HALT" << debug::reset << endl;
+
                     newState.IF.nop = 1;
                     newState.ID.nop = 1;
                 }
@@ -471,12 +560,34 @@ int main() {
         }
 
         //////////////////////////////////////////////////////////
-        dout << "NOP" << endl
-             << "if " << newState.IF.nop << endl
-             << "id " << newState.ID.nop << endl
-             << "ex " << newState.EX.nop << endl
-             << "mm " << newState.MEM.nop << endl
-             << "wb " << newState.WB.nop << endl;
+        {
+            dout << "----------------\n";
+            dout << "NOP old: ";
+            dout << (state.IF.nop ? debug::red : debug::reset) << "IF"
+                 << debug::reset << " ";
+            dout << (state.ID.nop ? debug::red : debug::reset) << "ID"
+                 << debug::reset << " ";
+            dout << (state.EX.nop ? debug::red : debug::reset) << "EX"
+                 << debug::reset << " ";
+            dout << (state.MEM.nop ? debug::red : debug::reset) << "MEM"
+                 << debug::reset << " ";
+            dout << (state.WB.nop ? debug::red : debug::reset) << "WB"
+                 << debug::reset << endl;
+
+            dout << "    new: ";
+            dout << (newState.IF.nop ? debug::red : debug::reset) << "IF"
+                 << debug::reset << " ";
+            dout << (newState.ID.nop ? debug::red : debug::reset) << "ID"
+                 << debug::reset << " ";
+            dout << (newState.EX.nop ? debug::red : debug::reset) << "EX"
+                 << debug::reset << " ";
+            dout << (newState.MEM.nop ? debug::red : debug::reset) << "MEM"
+                 << debug::reset << " ";
+            dout << (newState.WB.nop ? debug::red : debug::reset) << "WB"
+                 << debug::reset << endl;
+        }
+
+        // Full stop
         if (state.IF.nop && state.ID.nop && state.EX.nop && state.MEM.nop &&
             state.WB.nop)
             break;
@@ -485,8 +596,9 @@ int main() {
                                       // cycle 1, cycle 2 ...
 
         state = newState;
-        /*** The end of the cycle and updates the current state
-                         with the values calculated in this cycle. csa23 ***/
+        /* The end of the cycle
+         * updates the current state with the values calculated in this cycle.
+         */
         control_hazard_flag = 0;
         ++cycle;
     }
