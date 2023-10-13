@@ -309,8 +309,8 @@ int main() {
     DataMem myDataMem;
 
     stateStruct state;
-    state.IF.nop = 0;
     state.IF.PC = 0;
+    state.IF.nop = 0;
     state.ID.nop = 1;
     state.EX.nop = 1;
     state.MEM.nop = 1;
@@ -322,149 +322,169 @@ int main() {
 
     while (1) {
         dout << "cycle " << cycle << std::endl;
+
         /* --------------------- WB stage --------------------- */
-        if (state.WB.nop == 0) {
-            if (state.WB.wrt_enable) {
-                myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
+        {
+            if (state.WB.nop == 0) {
+                if (state.WB.wrt_enable) {
+                    myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
+                }
             }
         }
 
         /* --------------------- MEM stage --------------------- */
-        newState.WB.nop = state.MEM.nop;
-        if (newState.WB.nop == 0) {
-            if (state.MEM.rd_mem) {  // lw
-                newState.WB.Wrt_data =
-                    myDataMem.readDataMem(state.MEM.ALUresult);
+        {
+            newState.WB.nop = state.MEM.nop;
+            if (newState.WB.nop == 0) {
+                if (state.MEM.rd_mem) {  // lw
+                    newState.WB.Wrt_data =
+                        myDataMem.readDataMem(state.MEM.ALUresult);
+                }
+                if (state.MEM.wrt_mem) {  // sw
+                    myDataMem.writeDataMem(state.MEM.ALUresult,
+                                           state.MEM.Store_data);
+                }
+                newState.WB.Rs = state.MEM.Rs;
+                newState.WB.Rt = state.MEM.Rt;
+                newState.WB.Wrt_reg_addr = state.MEM.Wrt_reg_addr;
+                newState.WB.wrt_enable = state.MEM.wrt_enable;
             }
-            if (state.MEM.wrt_mem) {  // sw
-                myDataMem.writeDataMem(state.MEM.ALUresult,
-                                       state.MEM.Store_data);
-            }
-            newState.WB.Rs = state.MEM.Rs;
-            newState.WB.Rt = state.MEM.Rt;
-            newState.WB.Wrt_reg_addr = state.MEM.Wrt_reg_addr;
-            newState.WB.wrt_enable = state.MEM.wrt_enable;
         }
 
         /* --------------------- EX stage --------------------- */
-        newState.MEM.nop = state.EX.nop;
-        if (newState.MEM.nop == 0) {
-            if (state.EX.alu_op) {
-                // addition
-                if (state.EX.is_I_type) {
-                    // I type
-                    newState.MEM.ALUresult =
-                        bitset< 32 >(state.EX.Read_data1.to_ullong() +
-                                     state.EX.Imm.to_ullong());
+        {
+            newState.MEM.nop = state.EX.nop;
+            if (newState.MEM.nop == 0) {
+                if (state.EX.alu_op) {
+                    // addition
+                    if (state.EX.is_I_type) {
+                        // I type
+                        newState.MEM.ALUresult =
+                            bitset< 32 >(state.EX.Read_data1.to_ullong() +
+                                         state.EX.Imm.to_ullong());
+                    } else {
+                        // R type
+                        newState.MEM.ALUresult =
+                            bitset< 32 >(state.EX.Read_data1.to_ullong() +
+                                         state.EX.Read_data2.to_ullong());
+                    }
                 } else {
-                    // R type
+                    // subtraction
                     newState.MEM.ALUresult =
-                        bitset< 32 >(state.EX.Read_data1.to_ullong() +
+                        bitset< 32 >(state.EX.Read_data1.to_ullong() -
                                      state.EX.Read_data2.to_ullong());
                 }
-            } else {
-                // subtraction
-                newState.MEM.ALUresult =
-                    bitset< 32 >(state.EX.Read_data1.to_ullong() -
-                                 state.EX.Read_data2.to_ullong());
+                if (state.EX.wrt_mem) {
+                    newState.MEM.Store_data = state.EX.Read_data2;
+                }
+                newState.MEM.Rs = state.EX.Rs;
+                newState.MEM.Rt = state.EX.Rt;
+                newState.MEM.Wrt_reg_addr = state.EX.Wrt_reg_addr;
+                newState.MEM.wrt_enable = state.EX.wrt_enable;
+                newState.MEM.rd_mem = state.EX.rd_mem;
+                newState.MEM.wrt_mem = state.EX.wrt_mem;
             }
-            if (state.EX.wrt_mem) {
-                newState.MEM.Store_data = state.EX.Read_data2;
-            }
-            newState.MEM.Rs = state.EX.Rs;
-            newState.MEM.Rt = state.EX.Rt;
-            newState.MEM.Wrt_reg_addr = state.EX.Wrt_reg_addr;
-            newState.MEM.wrt_enable = state.EX.wrt_enable;
-            newState.MEM.rd_mem = state.EX.rd_mem;
-            newState.MEM.wrt_mem = state.EX.wrt_mem;
         }
 
         /* --------------------- ID stage --------------------- */
-        newState.EX.nop = state.ID.nop;
-        if (newState.EX.nop == 0) {
-            const bitset< 5 > opcode =
-                bitset< 5 >(state.ID.Instr.to_ullong() >> 26);
-            const bitset< 6 > funct =
-                bitset< 6 >(state.ID.Instr.to_ullong() & 0x3F);
-            if (opcode == 0x0) {
-                newState.EX.is_I_type = 0;
-                newState.EX.rd_mem = 0;
-                newState.EX.wrt_mem = 0;
-                newState.EX.wrt_enable = 1;
-                if (funct == 0x23) {
-                    newState.EX.alu_op = 0;  // subu
-                } else {
-                    newState.EX.alu_op = 1;  // addu
-                }
-            } else if (opcode != 0x4) {  // not bne
-                newState.EX.is_I_type = 1;
-                newState.EX.alu_op = 1;
-                if (opcode == 0x23) {  // lw
-                    newState.EX.rd_mem = 1;
+        {
+            newState.EX.nop = state.ID.nop;
+            if (newState.EX.nop == 0) {
+                const bitset< 5 > opcode =
+                    bitset< 5 >(state.ID.Instr.to_ullong() >> 26);
+                const bitset< 6 > funct =
+                    bitset< 6 >(state.ID.Instr.to_ullong() & 0x3F);
+
+                if (opcode == 0x0) {
+                    newState.EX.is_I_type = 0;
+                    newState.EX.rd_mem = 0;
                     newState.EX.wrt_mem = 0;
                     newState.EX.wrt_enable = 1;
-                } else if (opcode == 0x2B) {  // sw
+                    if (funct == 0x23) {
+                        newState.EX.alu_op = 0;  // subu
+                    } else {
+                        newState.EX.alu_op = 1;  // addu
+                    }
+                } else if (opcode != 0x4) {  // not bne
+                    newState.EX.is_I_type = 1;
+                    newState.EX.alu_op = 1;
+                    if (opcode == 0x23) {  // lw
+                        newState.EX.rd_mem = 1;
+                        newState.EX.wrt_mem = 0;
+                        newState.EX.wrt_enable = 1;
+                    } else if (opcode == 0x2B) {  // sw
+                        newState.EX.rd_mem = 0;
+                        newState.EX.wrt_mem = 1;
+                        newState.EX.wrt_enable = 0;
+                    }
+                } else if (opcode == 0x4) {  // bne
+                    newState.EX.is_I_type = 1;
+                    newState.EX.alu_op = 0;
                     newState.EX.rd_mem = 0;
-                    newState.EX.wrt_mem = 1;
+                    newState.EX.wrt_mem = 0;
                     newState.EX.wrt_enable = 0;
-                }
-            } else if (opcode == 0x4) {  // bne
-                newState.EX.is_I_type = 1;
-                newState.EX.alu_op = 0;
-                newState.EX.rd_mem = 0;
-                newState.EX.wrt_mem = 0;
-                newState.EX.wrt_enable = 0;
-            } else {
-                cout << "Opcode not accounted for" << endl;
-            }
-
-            if ((opcode != 0x2) && (opcode != 0x3)) {  // not a j-type
-                newState.EX.Rs =
-                    bitset< 5 >((state.ID.Instr.to_ullong() >> 21) & 0x1F);
-                newState.EX.Rt =
-                    bitset< 5 >((state.ID.Instr.to_ullong() >> 16) & 0x1F);
-                newState.EX.Read_data1 = myRF.readRF(newState.EX.Rs);
-                newState.EX.Read_data2 = myRF.readRF(newState.EX.Rt);
-                newState.EX.Imm =
-                    bitset< 16 >((state.ID.Instr.to_ullong() & 0xFFFF));
-                if (newState.EX.is_I_type == 1) {
-                    newState.EX.Wrt_reg_addr = newState.EX.Rt;
-                    // Rt is the destination register for I-type
                 } else {
-                    newState.EX.Wrt_reg_addr =
-                        bitset< 5 >((state.ID.Instr.to_ullong() >> 11) & 0x1F);
-                    // Rd is the destination register for R-type
+                    cout << "Opcode not accounted for" << endl;
                 }
-            }
-            if (opcode == 0x4) {  // bne
-                if (newState.EX.Read_data1 != newState.EX.Read_data2) {
-                    newState.IF.PC = state.IF.PC.to_ullong() +
-                                     (newState.EX.Imm.to_ullong() << 2);
-                    newState.ID.nop = 1;
-                    control_hazard_flag = 1;
+
+                if ((opcode != 0x2) && (opcode != 0x3)) {  // not a j-type
+                    newState.EX.Rs =
+                        bitset< 5 >((state.ID.Instr.to_ullong() >> 21) & 0x1F);
+                    newState.EX.Rt =
+                        bitset< 5 >((state.ID.Instr.to_ullong() >> 16) & 0x1F);
+                    newState.EX.Read_data1 = myRF.readRF(newState.EX.Rs);
+                    newState.EX.Read_data2 = myRF.readRF(newState.EX.Rt);
+                    newState.EX.Imm =
+                        bitset< 16 >((state.ID.Instr.to_ullong() & 0xFFFF));
+                    if (newState.EX.is_I_type == 1) {
+                        newState.EX.Wrt_reg_addr = newState.EX.Rt;
+                        // Rt is the destination register for I-type
+                    } else {
+                        newState.EX.Wrt_reg_addr = bitset< 5 >(
+                            (state.ID.Instr.to_ullong() >> 11) & 0x1F);
+                        // Rd is the destination register for R-type
+                    }
                 }
-                // else do nothing
+                if (opcode == 0x4) {  // bne
+                    if (newState.EX.Read_data1 != newState.EX.Read_data2) {
+                        newState.IF.PC = state.IF.PC.to_ullong() +
+                                         (newState.EX.Imm.to_ullong() << 2);
+                        newState.ID.nop = 1;
+                        control_hazard_flag = 1;
+                    }
+                    // else do nothing
+                }
             }
         }
 
         /* --------------------- IF stage --------------------- */
-        if (control_hazard_flag) {
-            newState.ID.nop = 1;
-        } else {
-            newState.ID.nop = state.IF.nop;
-        }
-        if (newState.ID.nop == 0) {
-            newState.IF.PC =
-                bitset< 32 >(state.IF.PC.to_ullong() + 4);  // PC = PC + 4
-            newState.ID.Instr =
-                myInsMem.readInstr(state.IF.PC);    // read from imem
-            if (newState.ID.Instr == 0xFFFFFFFF) {  // check for halt
-                newState.IF.nop = 1;
+        {
+            if (control_hazard_flag) {
                 newState.ID.nop = 1;
+            } else {
+                newState.ID.nop = state.IF.nop;
+            }
+            if (newState.ID.nop == 0) {
+                newState.IF.PC =
+                    bitset< 32 >(state.IF.PC.to_ullong() + 4);  // PC = PC + 4
+                newState.ID.Instr =
+                    myInsMem.readInstr(state.IF.PC);  // read from imem
+
+                if (newState.ID.Instr == 0xFFFFFFFF) {  // check for halt
+                    dout << debug::bg::red << "HALT" << debug::reset << endl;
+                    newState.IF.nop = 1;
+                    newState.ID.nop = 1;
+                }
             }
         }
 
         //////////////////////////////////////////////////////////
+        dout << "NOP" << endl
+             << "if " << newState.IF.nop << endl
+             << "id " << newState.ID.nop << endl
+             << "ex " << newState.EX.nop << endl
+             << "mm " << newState.MEM.nop << endl
+             << "wb " << newState.WB.nop << endl;
         if (state.IF.nop && state.ID.nop && state.EX.nop && state.MEM.nop &&
             state.WB.nop)
             break;
@@ -472,8 +492,8 @@ int main() {
         printState(newState, cycle);  // print states after executing cycle 0,
                                       // cycle 1, cycle 2 ...
 
-        state =
-            newState; /*** The end of the cycle and updates the current state
+        state = newState;
+        /*** The end of the cycle and updates the current state
                          with the values calculated in this cycle. csa23 ***/
         control_hazard_flag = 0;
         ++cycle;
