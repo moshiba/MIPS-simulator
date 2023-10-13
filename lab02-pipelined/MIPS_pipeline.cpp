@@ -459,6 +459,7 @@ int main() {
             newState.ID.Instr =
                 myInsMem.readInstr(state.IF.PC);    // read from imem
             if (newState.ID.Instr == 0xFFFFFFFF) {  // check for halt
+                newState.IF.nop = 1;
                 newState.ID.nop = 1;
             }
         }
