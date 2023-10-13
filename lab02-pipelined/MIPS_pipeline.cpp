@@ -427,7 +427,7 @@ int main() {
                     freeze_if = 1;  // TODO: fix false-halt
                     freeze_id = 1;
                     // create bubble
-                    newState.EX = {0};
+                    newState.EX = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
                 }
 
                 // Ex-Ex hazard control
