@@ -449,7 +449,7 @@ int main() {
             const unsigned funct = instruction & 0x3F;
             const unsigned imm = instruction & 0xFFFF;
             const uint32_t sign_extended_imm = (imm ^ 0x8000) - 0x8000;
-            const bool is_empty = state.ID.Instr.none();
+            const bool is_bubble = state.ID.Instr.none();
             const bool is_r_type = opcode == 0x00;
             // The only J-type here is HALT
             const bool is_j_type = opcode == 0x3F;
@@ -490,7 +490,7 @@ int main() {
                 }
                 newState.EX.Read_data1 = myRF.readRF(newState.EX.Rs);
                 newState.EX.Read_data2 = myRF.readRF(newState.EX.Rt);
-                newState.EX.wrt_enable = !is_empty && (is_r_type || is_load);
+                newState.EX.wrt_enable = !is_bubble && (is_r_type || is_load);
                 if (newState.EX.wrt_enable) {
                     newState.EX.Wrt_reg_addr = is_r_type ? rd : rt;
                 }
