@@ -466,32 +466,32 @@ int main() {
             const bool is_store = opcode == 0x2B;
             const bool is_branch = opcode == 0x05;
 
-            {
-                const unsigned shamt = (instruction >> 6) & 0x1F;
-                const unsigned jmp_addr = instruction & 0x3FFFFFF;
-
-                if (is_r_type) {
-                    dout << debug::bg::white << debug::black << "R-type"
-                         << debug::reset << uppercase << " opcode=0x" << hex
-                         << opcode << " rs=" << dec << rs << " rt=" << rt
-                         << " rd=" << rd << " shamt=" << shamt << " funct=0x"
-                         << hex << funct << endl;
-                }
-                if (is_i_type) {
-                    dout << debug::bg::white << debug::black << "I-type"
-                         << debug::reset << uppercase << " opcode=0x" << hex
-                         << opcode << " rs=" << dec << rs << " rt=" << rt
-                         << " imm=" << imm << endl;
-                }
-                if (is_j_type) {
-                    dout << debug::bg::white << debug::black << "I-type"
-                         << debug::reset << uppercase << " opcode=0x" << opcode
-                         << " addr=" << jmp_addr << endl;
-                }
-                std::cout.copyfmt(oldCoutState);
-            }
-
             if (!state.ID.nop) {
+                {
+                    const unsigned shamt = (instruction >> 6) & 0x1F;
+                    const unsigned jmp_addr = instruction & 0x3FFFFFF;
+
+                    if (is_r_type) {
+                        dout << debug::bg::white << debug::black << "R-type"
+                             << debug::reset << uppercase << " opcode=0x" << hex
+                             << opcode << " rs=" << dec << rs << " rt=" << rt
+                             << " rd=" << rd << " shamt=" << shamt
+                             << " funct=0x" << hex << funct << endl;
+                    }
+                    if (is_i_type) {
+                        dout << debug::bg::white << debug::black << "I-type"
+                             << debug::reset << uppercase << " opcode=0x" << hex
+                             << opcode << " rs=" << dec << rs << " rt=" << rt
+                             << " imm=" << imm << endl;
+                    }
+                    if (is_j_type) {
+                        dout << debug::bg::white << debug::black << "I-type"
+                             << debug::reset << uppercase << " opcode=0x"
+                             << opcode << " addr=" << jmp_addr << endl;
+                    }
+                    std::cout.copyfmt(oldCoutState);
+                }
+
                 if (is_r_type || is_i_type) {
                     newState.EX.Rs = rs;
                     newState.EX.Rt = rt;
