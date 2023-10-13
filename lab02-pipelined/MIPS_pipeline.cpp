@@ -411,8 +411,7 @@ int main() {
             dout << "----------------\nEX\n";
 
             const unsigned operand1 = state.EX.Read_data1.to_ulong();
-            const uint32_t sign_extended_imm =
-                (state.EX.Imm.to_ulong() ^ 0x8000) - 0x8000;
+            const uint32_t sign_extended_imm = state.EX.Imm.to_ulong();
             const unsigned operand2 = state.EX.is_I_type
                                           ? sign_extended_imm
                                           : state.EX.Read_data2.to_ulong();
@@ -449,6 +448,7 @@ int main() {
             const unsigned rd = (instruction >> 11) & 0x1F;
             const unsigned funct = instruction & 0x3F;
             const unsigned imm = instruction & 0xFFFF;
+            const uint32_t sign_extended_imm = (imm ^ 0x8000) - 0x8000;
             const bool is_empty = state.ID.Instr.none();
             const bool is_r_type = opcode == 0x00;
             // The only J-type here is HALT
@@ -461,8 +461,6 @@ int main() {
             {
                 const unsigned shamt = (instruction >> 6) & 0x1F;
                 const unsigned jmp_addr = instruction & 0x3FFFFFF;
-
-                // const unsigned sign_extended_imm = (imm ^ 0x8000) - 0x8000;
 
                 if (is_r_type) {
                     dout << debug::bg::white << debug::black << "R-type"
@@ -500,7 +498,7 @@ int main() {
                 newState.EX.is_I_type = is_i_type;
                 newState.EX.rd_mem = is_load;
                 newState.EX.wrt_mem = is_store;
-                newState.EX.Imm = imm;
+                newState.EX.Imm = sign_extended_imm;
             }
 
             newState.EX.nop = state.ID.nop;
