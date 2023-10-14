@@ -427,7 +427,20 @@ int main() {
                     freeze_if = 1;  // TODO: fix false-halt
                     freeze_id = 1;
                     // create bubble
-                    newState.EX = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+                    {
+                        newState.EX.Read_data1 = 0;
+                        newState.EX.Read_data2 = 0;
+                        newState.EX.Imm = 0;
+                        newState.EX.Rs = 0;
+                        newState.EX.Rt = 0;
+                        newState.EX.Wrt_reg_addr = 0;
+                        newState.EX.is_I_type = 0;
+                        newState.EX.rd_mem = 0;
+                        newState.EX.wrt_enable = 0;
+                        newState.EX.alu_op = 0;
+                        newState.EX.wrt_enable = 0;
+                        newState.EX.nop = 0;
+                    }
                 }
 
                 // Ex-Ex hazard control
