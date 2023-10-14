@@ -350,16 +350,44 @@ int main() {
     }
     {  // ID
         state.ID.nop = 1;
+        // init rest to 0
+        state.ID.Instr = 0;
     }
     {  // EX
         state.EX.nop = 1;
         state.EX.alu_op = 1;
+        // init rest to 0
+        state.EX.Read_data1 = 0;
+        state.EX.Read_data2 = 0;
+        state.EX.Imm = 0;
+        state.EX.Rs = 0;
+        state.EX.Rt = 0;
+        state.EX.Wrt_reg_addr = 0;
+        state.EX.is_I_type = 0;
+        state.EX.rd_mem = 0;
+        state.EX.wrt_mem = 0;
+        state.EX.wrt_enable = 0;
     }
     {  // MEM
         state.MEM.nop = 1;
+        // init rest to 0
+        state.MEM.ALUresult = 0;
+        state.MEM.Store_data = 0;
+        state.MEM.Rs = 0;
+        state.MEM.Rt = 0;
+        state.MEM.Wrt_reg_addr = 0;
+        state.MEM.rd_mem = 0;
+        state.MEM.wrt_mem = 0;
+        state.MEM.wrt_enable = 0;
     }
     {  // WB
         state.WB.nop = 1;
+        // init rest to 0
+        state.WB.Wrt_data = 0;
+        state.WB.Rs = 0;
+        state.WB.Rt = 0;
+        state.WB.Wrt_reg_addr = 0;
+        state.WB.wrt_enable = 0;
     }
     stateStruct newState = state;
     int cycle = 0;
