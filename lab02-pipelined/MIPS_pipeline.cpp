@@ -391,12 +391,14 @@ int main() {
             dout << "----------------\nMEM\n";
 
             if (!state.MEM.nop) {
-                if (state.MEM.rd_mem) {  // lw
+                if (state.MEM.rd_mem || state.MEM.wrt_mem) {
+                    if (state.MEM.wrt_mem) {  // sw
+                        myDataMem.writeDataMem(state.MEM.ALUresult,
+                                               state.MEM.Store_data);
+                    }
+                    // lw
                     newState.WB.Wrt_data =
                         myDataMem.readDataMem(state.MEM.ALUresult);
-                } else if (state.MEM.wrt_mem) {  // sw
-                    myDataMem.writeDataMem(state.MEM.ALUresult,
-                                           state.MEM.Store_data);
                 } else {
                     newState.WB.Wrt_data = state.MEM.ALUresult;
                 }
