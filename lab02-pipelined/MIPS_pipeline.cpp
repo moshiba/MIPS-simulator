@@ -1,6 +1,7 @@
 #include <bitset>
 #include <exception>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -343,21 +344,53 @@ int main() {
     DataMem myDataMem;
 
     stateStruct state;
-    {
+    {  // IF
         state.IF.PC = 0;
         state.IF.nop = 0;
     }
-    { state.ID.nop = 1; }
-    {
+    {  // ID
+        state.ID.nop = 1;
+        // init rest to 0
+        state.ID.Instr = 0;
+    }
+    {  // EX
         state.EX.nop = 1;
         state.EX.alu_op = 1;
+        // init rest to 0
+        state.EX.Read_data1 = 0;
+        state.EX.Read_data2 = 0;
+        state.EX.Imm = 0;
+        state.EX.Rs = 0;
+        state.EX.Rt = 0;
+        state.EX.Wrt_reg_addr = 0;
+        state.EX.is_I_type = 0;
+        state.EX.rd_mem = 0;
+        state.EX.wrt_mem = 0;
+        state.EX.wrt_enable = 0;
     }
-    { state.MEM.nop = 1; }
-    { state.WB.nop = 1; }
+    {  // MEM
+        state.MEM.nop = 1;
+        // init rest to 0
+        state.MEM.ALUresult = 0;
+        state.MEM.Store_data = 0;
+        state.MEM.Rs = 0;
+        state.MEM.Rt = 0;
+        state.MEM.Wrt_reg_addr = 0;
+        state.MEM.rd_mem = 0;
+        state.MEM.wrt_mem = 0;
+        state.MEM.wrt_enable = 0;
+    }
+    {  // WB
+        state.WB.nop = 1;
+        // init rest to 0
+        state.WB.Wrt_data = 0;
+        state.WB.Rs = 0;
+        state.WB.Rt = 0;
+        state.WB.Wrt_reg_addr = 0;
+        state.WB.wrt_enable = 0;
+    }
     stateStruct newState = state;
     int cycle = 0;
-
-    bool control_hazard_flag = 0;
 
     while (1) {
         dout << "\n"
@@ -366,6 +399,9 @@ int main() {
                 "\n"
                 "cycle "
              << cycle << std::endl;
+
+        bool freeze_if = 0;
+        bool freeze_id = 0;
 
         /* --------------------- WB stage --------------------- */
         {
@@ -383,13 +419,16 @@ int main() {
             dout << "----------------\nMEM\n";
 
             if (!state.MEM.nop) {
-                if (state.MEM.rd_mem) {  // lw
+                if (state.MEM.rd_mem || state.MEM.wrt_mem) {
+                    if (state.MEM.wrt_mem) {  // sw
+                        myDataMem.writeDataMem(state.MEM.ALUresult,
+                                               state.MEM.Store_data);
+                    }
+                    // lw
                     newState.WB.Wrt_data =
                         myDataMem.readDataMem(state.MEM.ALUresult);
-                }
-                if (state.MEM.wrt_mem) {  // sw
-                    myDataMem.writeDataMem(state.MEM.ALUresult,
-                                           state.MEM.Store_data);
+                } else {
+                    newState.WB.Wrt_data = state.MEM.ALUresult;
                 }
                 newState.WB.Rs = state.MEM.Rs;
                 newState.WB.Rt = state.MEM.Rt;
@@ -404,24 +443,67 @@ int main() {
         {
             dout << "----------------\nEX\n";
 
-            const unsigned operand1 = state.EX.Read_data1.to_ulong();
-            const uint32_t sign_extended_imm =
-                (state.EX.Imm.to_ulong() ^ 0x8000) - 0x8000;
-            const unsigned operand2 = state.EX.is_I_type
-                                          ? sign_extended_imm
-                                          : state.EX.Read_data2.to_ulong();
-
             if (!state.EX.nop) {
+                // Mem-Ex hazard control
+                const bool mem_ex_forward_rs =
+                    state.WB.wrt_enable &&
+                    (state.WB.Wrt_reg_addr == state.EX.Rs);
+                const bool mem_ex_forward_rt =
+                    state.WB.wrt_enable &&
+                    (state.WB.Wrt_reg_addr == state.EX.Rt);
+
+                // Insert bubble between lw-add
+                if (state.EX.rd_mem &&
+                    (mem_ex_forward_rs || mem_ex_forward_rt)) {
+                    freeze_if = 1;  // TODO: fix false-halt
+                    freeze_id = 1;
+                    // create bubble
+                    {
+                        newState.EX.Read_data1 = 0;
+                        newState.EX.Read_data2 = 0;
+                        newState.EX.Imm = 0;
+                        newState.EX.Rs = 0;
+                        newState.EX.Rt = 0;
+                        newState.EX.Wrt_reg_addr = 0;
+                        newState.EX.is_I_type = 0;
+                        newState.EX.rd_mem = 0;
+                        newState.EX.wrt_enable = 0;
+                        newState.EX.alu_op = 0;
+                        newState.EX.wrt_enable = 0;
+                        newState.EX.nop = 0;
+                    }
+                }
+
+                // Ex-Ex hazard control
+                const bool ex_ex_forward_rs =
+                    state.MEM.wrt_enable &&
+                    (state.MEM.Wrt_reg_addr == state.EX.Rs);
+                const bool ex_ex_forward_rt =
+                    state.MEM.wrt_enable &&
+                    (state.MEM.Wrt_reg_addr == state.EX.Rt);
+
+                const unsigned operand1 =
+                    mem_ex_forward_rs
+                        ? state.WB.Wrt_data.to_ulong()
+                        : (ex_ex_forward_rs ? state.MEM.ALUresult.to_ulong()
+                                            : state.EX.Read_data1.to_ulong());
+                const unsigned operand2 =
+                    state.EX.is_I_type
+                        ? state.EX.Imm.to_ulong()
+                        : (mem_ex_forward_rt
+                               ? state.WB.Wrt_data.to_ulong()
+                               : (ex_ex_forward_rt
+                                      ? state.MEM.ALUresult.to_ulong()
+                                      : state.EX.Read_data2.to_ulong()));
+
                 if (state.EX.alu_op) {
                     newState.MEM.ALUresult = operand1 + operand2;
                 } else {
                     newState.MEM.ALUresult = operand1 - operand2;
                 }
 
-                if (state.EX.wrt_mem) {
-                    newState.MEM.Store_data = state.EX.Read_data2;
-                }
-
+                // if (state.EX.wrt_mem) { DON'T CARE
+                newState.MEM.Store_data = state.EX.Read_data2;
                 newState.MEM.Rs = state.EX.Rs;
                 newState.MEM.Rt = state.EX.Rt;
                 newState.MEM.Wrt_reg_addr = state.EX.Wrt_reg_addr;
@@ -443,69 +525,79 @@ int main() {
             const unsigned rd = (instruction >> 11) & 0x1F;
             const unsigned funct = instruction & 0x3F;
             const unsigned imm = instruction & 0xFFFF;
-            const bool is_empty = state.ID.Instr.none();
+            const uint32_t sign_extended_imm = (imm ^ 0x8000) - 0x8000;
+            const bool is_bubble = state.ID.Instr.none();
             const bool is_r_type = opcode == 0x00;
             // The only J-type here is HALT
             const bool is_j_type = opcode == 0x3F;
             const bool is_i_type = !(is_r_type || is_j_type);
             const bool is_load = opcode == 0x23;
             const bool is_store = opcode == 0x2B;
-            const bool is_branch = opcode == 0x04;
+            const bool is_branch = opcode == 0x05;
 
-            {
-                const unsigned shamt = (instruction >> 6) & 0x1F;
-                const unsigned jmp_addr = instruction & 0x3FFFFFF;
+            if (!state.ID.nop && !freeze_id) {
+                {
+                    const unsigned shamt = (instruction >> 6) & 0x1F;
+                    const unsigned jmp_addr = instruction & 0x3FFFFFF;
 
-                // const unsigned sign_extended_imm = (imm ^ 0x8000) - 0x8000;
-
-                if (is_r_type) {
-                    dout << debug::bg::white << debug::black << "R-type"
-                         << debug::reset << uppercase << " opcode=0x" << hex
-                         << opcode << " rs=" << dec << rs << " rt=" << rt
-                         << " rd=" << rd << " shamt=" << shamt << " funct=0x"
-                         << hex << funct << endl;
+                    if (is_r_type) {
+                        dout << debug::bg::white << debug::black << "R-type"
+                             << debug::reset << uppercase << " opcode=0x" << hex
+                             << opcode << " rs=" << dec << rs << " rt=" << rt
+                             << " rd=" << rd << " shamt=" << shamt
+                             << " funct=0x" << hex << funct << endl;
+                    }
+                    if (is_i_type) {
+                        dout << debug::bg::white << debug::black << "I-type"
+                             << debug::reset << uppercase << " opcode=0x" << hex
+                             << opcode << " rs=" << dec << rs << " rt=" << rt
+                             << " imm=" << imm << endl;
+                    }
+                    if (is_j_type) {
+                        dout << debug::bg::white << debug::black << "I-type"
+                             << debug::reset << uppercase << " opcode=0x"
+                             << opcode << " addr=" << jmp_addr << endl;
+                    }
+                    std::cout.copyfmt(oldCoutState);
                 }
-                if (is_i_type) {
-                    dout << debug::bg::white << debug::black << "I-type"
-                         << debug::reset << uppercase << " opcode=0x" << hex
-                         << opcode << " rs=" << dec << rs << " rt=" << rt
-                         << " imm=" << imm << endl;
-                }
-                if (is_j_type) {
-                    dout << debug::bg::white << debug::black << "I-type"
-                         << debug::reset << uppercase << " opcode=0x" << opcode
-                         << " addr=" << jmp_addr << endl;
-                }
-                std::cout.copyfmt(oldCoutState);
-            }
 
-            if (!state.ID.nop) {
                 if (is_r_type || is_i_type) {
                     newState.EX.Rs = rs;
                     newState.EX.Rt = rt;
                 }
                 newState.EX.Read_data1 = myRF.readRF(newState.EX.Rs);
                 newState.EX.Read_data2 = myRF.readRF(newState.EX.Rt);
-                newState.EX.wrt_enable = !is_empty && (is_r_type || is_load);
-                if (newState.EX.wrt_enable) {
-                    newState.EX.Wrt_reg_addr = is_r_type ? rd : rt;
-                }
-                newState.EX.alu_op = !(opcode == 0 && funct == 0x23);
+                newState.EX.wrt_enable = !is_bubble && (is_r_type || is_load);
+                // if (newState.EX.wrt_enable) { DON'T CARE
+                newState.EX.Wrt_reg_addr = is_r_type ? rd : rt;
+                newState.EX.alu_op =
+                    !(is_r_type && funct == 0x23);  // statement: (not 'subu')
                 newState.EX.is_I_type = is_i_type;
                 newState.EX.rd_mem = is_load;
                 newState.EX.wrt_mem = is_store;
-                newState.EX.Imm = imm;
+                newState.EX.Imm = sign_extended_imm;
+
+                if (is_branch) {  // BNE
+                    const unsigned relative_addr = sign_extended_imm << 2;
+                    const bool branch_taken =
+                        newState.EX.Read_data1 != newState.EX.Read_data2;
+
+                    if (branch_taken) {
+                        state.IF.PC = state.IF.PC.to_ulong() + relative_addr;
+                        freeze_if = 1;
+                    }
+                }
             }
 
-            newState.EX.nop = state.ID.nop;
+            newState.EX.nop = state.ID.nop || freeze_id;
         }
 
         /* --------------------- IF stage --------------------- */
         {
             dout << "----------------\nIF\n";
+            dout << " PC: " << state.IF.PC.to_ulong() << endl;
 
-            if (!control_hazard_flag && !state.IF.nop) {
-                newState.IF.PC = state.IF.PC.to_ullong() + 4;  // PC = PC + 4
+            if (!state.IF.nop && !freeze_if) {
                 newState.ID.Instr =
                     myInsMem.readInstr(state.IF.PC);  // read from imem
 
@@ -518,11 +610,13 @@ int main() {
                          << endl;
 
                     newState.IF.nop = 1;
-                    newState.ID.nop = 1;
+                    freeze_if = 1;  // newState.ID.nop = 1; will get overwritten
+                } else {
+                    newState.IF.PC = state.IF.PC.to_ulong() + 4;  // PC = PC + 4
                 }
             }
 
-            newState.ID.nop = state.IF.nop || control_hazard_flag;
+            newState.ID.nop = state.IF.nop || freeze_if;
         }
 
         //////////////////////////////////////////////////////////
@@ -565,7 +659,6 @@ int main() {
         /* The end of the cycle
          * updates the current state with the values calculated in this cycle.
          */
-        control_hazard_flag = 0;
         ++cycle;
     }
 
