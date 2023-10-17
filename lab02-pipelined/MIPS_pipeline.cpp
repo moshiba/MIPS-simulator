@@ -653,12 +653,22 @@ int main() {
 
                 if (is_branch) {  // BNE
                     const unsigned relative_addr = sign_extended_imm << 2;
+                    dout << "BNE relative_addr: " << relative_addr << endl;
                     const bool branch_taken =
                         newState.EX.Read_data1 != newState.EX.Read_data2;
 
                     if (branch_taken) {
+                        dout << debug::bg::cyan << "branch " << debug::red
+                             << "taken" << debug::reset
+                             << " PC: " << state.IF.PC.to_ulong();
+
                         state.IF.PC = state.IF.PC.to_ulong() + relative_addr;
                         freeze_if = 1;
+
+                        dout << " -> " << state.IF.PC.to_ulong() << endl;
+                    } else {
+                        dout << debug::bg::cyan << "branch " << debug::red
+                             << "NOT taken" << debug::reset << endl;
                     }
                 }
             }
@@ -693,6 +703,9 @@ int main() {
                     newState.IF.PC = state.IF.PC.to_ulong() + 4;  // PC = PC + 4
                 }
             }
+            dout << endl
+                 << "(old) " << state.IF.PC.to_ulong() << " -> "
+                 << newState.IF.PC.to_ulong() << " (new)" << endl;
 
             // newState.ID.nop = state.IF.nop || freeze_if;
             newState.ID.nop = state.IF.nop;
@@ -702,10 +715,10 @@ int main() {
         {
             dout << "----------------\n";
             dout << "NOP old: ";
-            dout << (state.IF.nop ? debug::red : debug::reset) << "IF"
-                 << debug::reset << " ";
-            dout << (state.ID.nop ? debug::red : debug::reset) << "ID"
-                 << debug::reset << " ";
+            dout << ((state.IF.nop || freeze_if) ? debug::red : debug::reset)
+                 << "IF" << debug::reset << " ";
+            dout << ((state.ID.nop || freeze_id) ? debug::red : debug::reset)
+                 << "ID" << debug::reset << " ";
             dout << (state.EX.nop ? debug::red : debug::reset) << "EX"
                  << debug::reset << " ";
             dout << (state.MEM.nop ? debug::red : debug::reset) << "MEM"
