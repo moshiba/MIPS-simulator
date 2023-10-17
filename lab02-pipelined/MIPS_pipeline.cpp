@@ -683,7 +683,10 @@ int main() {
                          << endl;
 
                     newState.IF.nop = 1;
+                    newState.ID.nop = 1;
                     freeze_if = 1;  // newState.ID.nop = 1; will get overwritten
+                    state.IF.nop = 1;  // HACK: modify the value that's going to
+                                       // overwrite newState.ID.nop
                 } else {
                     newState.IF.PC = state.IF.PC.to_ulong() + 4;  // PC = PC + 4
                 }
