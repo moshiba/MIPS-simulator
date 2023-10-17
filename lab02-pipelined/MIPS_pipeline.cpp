@@ -401,6 +401,7 @@ int main() {
 
         bool freeze_if = 0;
         bool freeze_id = 0;
+        bool bubble = 0;
 
         /* --------------------- WB stage --------------------- */
         {
@@ -418,14 +419,12 @@ int main() {
             dout << "----------------\nMEM\n";
 
             if (!state.MEM.nop) {
-                if (state.MEM.rd_mem || state.MEM.wrt_mem) {
-                    if (state.MEM.wrt_mem) {  // sw
-                        myDataMem.writeDataMem(state.MEM.ALUresult,
-                                               state.MEM.Store_data);
-                    }
-                    // lw
+                if (state.MEM.rd_mem) {  // lw
                     newState.WB.Wrt_data =
                         myDataMem.readDataMem(state.MEM.ALUresult);
+                } else if (state.MEM.wrt_mem) {  // sw
+                    myDataMem.writeDataMem(state.MEM.ALUresult,
+                                           state.MEM.Store_data);
                 } else {
                     newState.WB.Wrt_data = state.MEM.ALUresult;
                 }
@@ -452,26 +451,26 @@ int main() {
                     (state.WB.Wrt_reg_addr == state.EX.Rt);
 
                 // Insert bubble between lw-add
-                if (state.EX.rd_mem &&
-                    (mem_ex_forward_rs || mem_ex_forward_rt)) {
-                    freeze_if = 1;  // TODO: fix false-halt
-                    freeze_id = 1;
-                    // create bubble
-                    {
-                        newState.EX.Read_data1 = 0;
-                        newState.EX.Read_data2 = 0;
-                        newState.EX.Imm = 0;
-                        newState.EX.Rs = 0;
-                        newState.EX.Rt = 0;
-                        newState.EX.Wrt_reg_addr = 0;
-                        newState.EX.is_I_type = 0;
-                        newState.EX.rd_mem = 0;
-                        newState.EX.wrt_enable = 0;
-                        newState.EX.alu_op = 0;
-                        newState.EX.wrt_enable = 0;
-                        newState.EX.nop = 0;
-                    }
-                }
+                // if (state.EX.rd_mem &&
+                //     (mem_ex_forward_rs || mem_ex_forward_rt)) {
+                //     freeze_if = 1;  // TODO: fix false-halt
+                //     freeze_id = 1;
+                //     // create bubble
+                //     {
+                //         newState.EX.Read_data1 = 0;
+                //         newState.EX.Read_data2 = 0;
+                //         newState.EX.Imm = 0;
+                //         newState.EX.Rs = 0;
+                //         newState.EX.Rt = 0;
+                //         newState.EX.Wrt_reg_addr = 0;
+                //         newState.EX.is_I_type = 0;
+                //         newState.EX.rd_mem = 0;
+                //         newState.EX.wrt_enable = 0;
+                //         newState.EX.alu_op = 0;
+                //         newState.EX.wrt_enable = 0;
+                //         newState.EX.nop = 0;
+                //     }
+                // }
 
                 // Ex-Ex hazard control
                 const bool ex_ex_forward_rs =
@@ -481,19 +480,85 @@ int main() {
                     state.MEM.wrt_enable &&
                     (state.MEM.Wrt_reg_addr == state.EX.Rt);
 
-                const unsigned operand1 =
-                    mem_ex_forward_rs
-                        ? state.WB.Wrt_data.to_ulong()
-                        : (ex_ex_forward_rs ? state.MEM.ALUresult.to_ulong()
-                                            : state.EX.Read_data1.to_ulong());
-                const unsigned operand2 =
-                    state.EX.is_I_type
-                        ? state.EX.Imm.to_ulong()
-                        : (mem_ex_forward_rt
-                               ? state.WB.Wrt_data.to_ulong()
-                               : (ex_ex_forward_rt
-                                      ? state.MEM.ALUresult.to_ulong()
-                                      : state.EX.Read_data2.to_ulong()));
+                // const unsigned operand1 =
+                //     mem_ex_forward_rs
+                //         ? state.WB.Wrt_data.to_ulong()
+                //         : (ex_ex_forward_rs ? state.MEM.ALUresult.to_ulong()
+                //                             :
+                //                             state.EX.Read_data1.to_ulong());
+                // const unsigned operand2 =
+                //     state.EX.is_I_type
+                //         ? state.EX.Imm.to_ulong()
+                //         : (mem_ex_forward_rt
+                //                ? state.WB.Wrt_data.to_ulong()
+                //                : (ex_ex_forward_rt
+                //                       ? state.MEM.ALUresult.to_ulong()
+                //                       : state.EX.Read_data2.to_ulong()));
+
+                unsigned operand1;
+                unsigned operand2;
+
+                if (ex_ex_forward_rs) {
+                    cout << "Found EX-EX RS at cycle: " << cycle << endl;
+                    // we might have some forwarding, but first we need to make
+                    // sure previous instruction was add or sub; recall result
+                    // doesn't become available for lw until after the MEM stage
+                    // exexutes
+                    if (state.MEM.wrt_enable &&
+                        !state.MEM.rd_mem) {  // add and sub
+                        operand1 = state.MEM.ALUresult.to_ulong();
+                    }
+
+                    else if (state.MEM.rd_mem) {
+                        cout << "This was a lw --stalling-- at cycle: " << cycle
+                             << endl;
+                        // we have a lw
+                        // we need to stall one cycle
+                        bubble = 1;
+                        freeze_if = 1;
+                        freeze_id = 1;
+                        // state.IF.nop = 1;
+                        // state.ID.nop = 1;
+                        // state.EX.nop = 1;
+                        // bubble is handled later in the code
+                    }
+                } else if (mem_ex_forward_rs) {  // else if here because EX-EX
+                                                 // takes priority over MEM-EX
+                    cout << "Found MEM-EX RS at: " << cycle << endl;
+                    if (state.WB.wrt_enable) {
+                        operand1 = state.WB.Wrt_data.to_ulong();
+                    }
+                } else {  // no dependencies detected for operand 1
+                    operand1 = state.EX.Read_data1.to_ulong();
+                }
+
+                if (state.EX.is_I_type) {
+                    operand2 = state.EX.Imm.to_ulong();
+                } else if (ex_ex_forward_rt) {
+                    cout << "Found EX-EX Rt at: " << cycle << endl;
+                    if (state.MEM.wrt_enable && !state.MEM.rd_mem) {
+                        operand2 = state.MEM.ALUresult.to_ulong();
+                    } else if (state.MEM.rd_mem) {
+                        // we need to stall one cycle
+                        cout << "This was a lw --stalling-- at cycle: " << cycle
+                             << endl;
+                        bubble = 1;
+                        freeze_if = 1;
+                        freeze_id = 1;
+                        // state.IF.nop = 1;
+                        // state.ID.nop = 1;
+                        // state.EX.nop = 1;
+                        // bubble is handled later in the code
+                    }
+                } else if (mem_ex_forward_rt) {  // else if here because EX-EX
+                                                 // takes priority over MEM-EX
+                    cout << "Found MEM-EX Rt at: " << cycle << endl;
+                    if (state.WB.wrt_enable) {
+                        operand2 = state.WB.Wrt_data.to_ulong();
+                    }
+                } else {  // no dependencies detected for operand 2
+                    operand2 = state.EX.Read_data1.to_ulong();
+                }
 
                 if (state.EX.alu_op) {
                     newState.MEM.ALUresult = operand1 + operand2;
@@ -511,8 +576,14 @@ int main() {
                 newState.MEM.wrt_mem = state.EX.wrt_mem;
             }
 
-            newState.MEM.nop = state.EX.nop;
+            if (bubble) {
+                newState.MEM.nop = 1;
+            } else {
+                newState.MEM.nop = state.EX.nop;
+            }
         }
+        cout << "STATE.EX.nop is " << state.EX.nop << " at cycle " << cycle
+             << endl;
 
         /* --------------------- ID stage --------------------- */
         {
@@ -588,7 +659,8 @@ int main() {
                 }
             }
 
-            newState.EX.nop = state.ID.nop || freeze_id;
+            // newState.EX.nop = state.ID.nop || freeze_id;
+            newState.EX.nop = state.ID.nop;
         }
 
         /* --------------------- IF stage --------------------- */
@@ -615,7 +687,8 @@ int main() {
                 }
             }
 
-            newState.ID.nop = state.IF.nop || freeze_if;
+            // newState.ID.nop = state.IF.nop || freeze_if;
+            newState.ID.nop = state.IF.nop;
         }
 
         //////////////////////////////////////////////////////////
