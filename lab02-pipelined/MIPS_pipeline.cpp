@@ -557,7 +557,7 @@ int main() {
                         operand2 = state.WB.Wrt_data.to_ulong();
                     }
                 } else {  // no dependencies detected for operand 2
-                    operand2 = state.EX.Read_data1.to_ulong();
+                    operand2 = state.EX.Read_data2.to_ulong();
                 }
 
                 if (state.EX.alu_op) {
@@ -582,8 +582,6 @@ int main() {
                 newState.MEM.nop = state.EX.nop;
             }
         }
-        cout << "STATE.EX.nop is " << state.EX.nop << " at cycle " << cycle
-             << endl;
 
         /* --------------------- ID stage --------------------- */
         {
