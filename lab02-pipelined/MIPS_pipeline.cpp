@@ -396,9 +396,8 @@ int main() {
         dout << "\n"
                 "================================"
                 "================================"
-                "\n"
-                "cycle "
-             << cycle << std::endl;
+             << debug::bg::white << debug::black << endl
+             << "cycle " << cycle << debug::reset << endl;
 
         bool freeze_if = 0;
         bool freeze_id = 0;
