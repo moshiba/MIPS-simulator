@@ -499,7 +499,7 @@ int main() {
                 unsigned operand2;
 
                 if (ex_ex_forward_rs) {
-                    cout << "Found EX-EX RS at cycle: " << cycle << endl;
+                    dout << "EX-EX RS" << endl;
                     // we might have some forwarding, but first we need to make
                     // sure previous instruction was add or sub; recall result
                     // doesn't become available for lw until after the MEM stage
@@ -510,8 +510,9 @@ int main() {
                     }
 
                     else if (state.MEM.rd_mem) {
-                        cout << "This was a lw --stalling-- at cycle: " << cycle
+                        dout << "This was a lw --stalling-- at cycle: " << cycle
                              << endl;
+                        // FIXME:
                         // we have a lw
                         // we need to stall one cycle
                         bubble = 1;
@@ -524,7 +525,7 @@ int main() {
                     }
                 } else if (mem_ex_forward_rs) {  // else if here because EX-EX
                                                  // takes priority over MEM-EX
-                    cout << "Found MEM-EX RS at: " << cycle << endl;
+                    dout << "MEM-EX RS" << endl;
                     if (state.WB.wrt_enable) {
                         operand1 = state.WB.Wrt_data.to_ulong();
                     }
@@ -535,13 +536,14 @@ int main() {
                 if (state.EX.is_I_type) {
                     operand2 = state.EX.Imm.to_ulong();
                 } else if (ex_ex_forward_rt) {
-                    cout << "Found EX-EX Rt at: " << cycle << endl;
+                    dout << "EX-EX Rt" << endl;
                     if (state.MEM.wrt_enable && !state.MEM.rd_mem) {
                         operand2 = state.MEM.ALUresult.to_ulong();
                     } else if (state.MEM.rd_mem) {
                         // we need to stall one cycle
-                        cout << "This was a lw --stalling-- at cycle: " << cycle
+                        dout << "This was a lw --stalling-- at cycle: " << cycle
                              << endl;
+                        // FIXME:
                         bubble = 1;
                         freeze_if = 1;
                         freeze_id = 1;
@@ -552,7 +554,7 @@ int main() {
                     }
                 } else if (mem_ex_forward_rt) {  // else if here because EX-EX
                                                  // takes priority over MEM-EX
-                    cout << "Found MEM-EX Rt at: " << cycle << endl;
+                    dout << "MEM-EX Rt" << endl;
                     if (state.WB.wrt_enable) {
                         operand2 = state.WB.Wrt_data.to_ulong();
                     }
