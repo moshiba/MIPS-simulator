@@ -443,6 +443,9 @@ int main() {
         {
             dout << "----------------\nEX\n";
 
+            unsigned operand1;
+            unsigned operand2;
+
             if (!state.EX.nop) {
                 // Mem-Ex hazard control
                 const bool mem_ex_forward_rs =
@@ -496,9 +499,6 @@ int main() {
                 //                : (ex_ex_forward_rt
                 //                       ? state.MEM.ALUresult.to_ulong()
                 //                       : state.EX.Read_data2.to_ulong()));
-
-                unsigned operand1;
-                unsigned operand2;
 
                 if (ex_ex_forward_rs) {
                     dout << "EX-EX RS" << endl;
@@ -582,6 +582,8 @@ int main() {
 
             if (bubble) {
                 newState.MEM.nop = 1;
+                newState.EX.Read_data1 = operand1;
+                newState.EX.Read_data2 = operand2;
             } else {
                 newState.MEM.nop = state.EX.nop;
             }
