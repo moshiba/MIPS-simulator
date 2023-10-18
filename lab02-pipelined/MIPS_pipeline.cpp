@@ -663,7 +663,7 @@ int main() {
                              << " PC: " << state.IF.PC.to_ulong();
 
                         state.IF.PC = state.IF.PC.to_ulong() + relative_addr;
-                        freeze_if = 1;
+                        newState.ID.nop = 1;
 
                         dout << " -> " << state.IF.PC.to_ulong() << endl;
                     } else {
