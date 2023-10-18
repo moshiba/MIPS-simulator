@@ -590,6 +590,7 @@ int main() {
         }
 
         /* --------------------- ID stage --------------------- */
+        bool branch_pc_flag = 0;
         {
             dout << "----------------\nID\n";
             const unsigned instruction = state.ID.Instr.to_ulong();
@@ -664,6 +665,7 @@ int main() {
 
                         state.IF.PC = state.IF.PC.to_ulong() + relative_addr;
                         newState.ID.nop = 1;
+                        branch_pc_flag = 1;
 
                         dout << " -> " << state.IF.PC.to_ulong() << endl;
                     } else {
@@ -699,6 +701,8 @@ int main() {
                     freeze_if = 1;  // newState.ID.nop = 1; will get overwritten
                     state.IF.nop = 1;  // HACK: modify the value that's going to
                                        // overwrite newState.ID.nop
+                } else if (branch_pc_flag) {
+                    newState.IF.PC = state.IF.PC.to_ulong();
                 } else {
                     newState.IF.PC = state.IF.PC.to_ulong() + 4;  // PC = PC + 4
                 }
