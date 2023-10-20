@@ -35,6 +35,7 @@ The 32 bit address is divided into
 #include <sstream>
 #include <string>
 #include <vector>
+
 using namespace std;
 // access state:
 #define NA 0          // no action
@@ -93,7 +94,7 @@ class cache {
         // initialize the cache according to cache parameters
     }
 
-    auto write(auto addr) {
+    auto write(unsigned addr) {
         /*
         step 1: select the set in our L1 cache using set index bits
         step 2: iterate through each way in the current set
@@ -105,7 +106,7 @@ class cache {
         */
     }
 
-    auto writeL2(auto addr) {
+    auto writeL2(unsigned addr) {
         /*
         step 1: select the set in our L2 cache using set index bits
         step 2: iterate through each way in the current set
@@ -117,7 +118,7 @@ class cache {
         */
     }
 
-    auto readL1(auto addr) {
+    auto readL1(unsigned addr) {
         /*
         step 1: select the set in our L1 cache using set index bits
         step 2: iterate through each way in the current set
@@ -128,7 +129,7 @@ class cache {
         */
     }
 
-    auto readL2(auto addr) {
+    auto readL2(unsigned addr) {
         /*
         step 1: select the set in our L2 cache using set index bits
         step 2: iterate through each way in the current set
@@ -153,18 +154,20 @@ class CacheSystem {
 
    public:
     int L1AcceState, L2AcceState, MemAcceState;
-    auto read(auto addr){};
-    auto write(auto addr){};
+    auto read(unsigned addr){};
+    auto write(unsigned addr){};
 };
+
 class Cache {
     set *CacheSet;
 
    public:
-    auto read_access(auto addr){};
-    auto write_access(auto addr){};
-    auto check_exist(auto addr){};
-    auto evict(auto addr){};
+    auto read_access(unsigned addr){};
+    auto write_access(unsigned addr){};
+    auto check_exist(unsigned addr){};
+    auto evict(unsigned addr){};
 };
+
 /*********************************** ↑↑↑ Todo: Implement by you ↑↑↑
  * ******************************************/
 
