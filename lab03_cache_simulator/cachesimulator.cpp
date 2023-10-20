@@ -1,15 +1,28 @@
-/*
-Cache Simulator
-Level one L1 and level two L2 cache parameters are read from file (block size,
-line per set and set per cache). The 32 bit address is divided into tag bits
-(t), set index bits (s) and block offset bits (b) s = log2(#sets)   b =
-log2(block size in bytes)  t=32-s-b 32 bit address (MSB -> LSB): TAG || SET ||
-OFFSET
+/* Cache Simulator
+Level one L1 and level two L2 cache parameters are read from file:
+- block size
+- line per set
+- set per cache
 
-Tag Bits   : the tag field along with the valid bit is used to determine whether
-the block in the cache is valid or not. Index Bits : the set index field is used
-to determine which set in the cache the block is stored in. Offset Bits: the
-offset field is used to determine which byte in the block is being accessed.
+The 32 bit address is divided into
+- tag bits (t)
+    - t = 32-s-b
+- set index bits (s)
+    - s = log2(#sets)
+- block offset bits (b)
+    - b = log2(block size in bytes)
+
+32 bit address (MSB -> LSB): TAG || SET || OFFSET
+
+- Tag Bits:
+    - the tag field along with the valid bit is used to determine whether the
+      block in the cache is valid or not.
+- Index Bits:
+    - the set index field is used to determine which set in the cache the block
+      is stored in.
+- Offset Bits:
+    - the offset field is used to determine which byte in the block is being
+      accessed.
 */
 
 #include <algorithm>
