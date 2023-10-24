@@ -217,11 +217,11 @@ int main(int argc, char *argv[]) {
     //          cacheconfig.L2size);
 
     int L1AcceState =
-        0;  // L1 access state variable, can be one of NA, RH, RM, WH, WM;
+        NA;  // L1 access state variable, can be one of NA, RH, RM, WH, WM;
     int L2AcceState =
-        0;  // L2 access state variable, can be one of NA, RH, RM, WH, WM;
-    int MemAcceState =
-        0;  // Main Memory access state variable, can be either NA or WH;
+        NA;  // L2 access state variable, can be one of NA, RH, RM, WH, WM;
+    int MemAcceState = NOWRITEMEM;  // Main Memory access state variable, can be
+                                    // either NA or WH;
 
     if (traces.is_open() && tracesout.is_open()) {
         while (
