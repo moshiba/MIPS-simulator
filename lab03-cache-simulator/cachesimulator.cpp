@@ -218,7 +218,7 @@ class CacheSystem {
 };
 
 class Cache {
-    set *CacheSet;
+    set* CacheSet;
 
    public:
     auto read_access(unsigned addr){};
@@ -230,7 +230,7 @@ class Cache {
 /*********************************** ↑↑↑ Todo: Implement by you ↑↑↑
  * ******************************************/
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     config cacheconfig;
     ifstream cache_params;
     string dummyLine;
