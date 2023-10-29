@@ -396,12 +396,12 @@ int main() {
         dout << "\n"
                 "================================"
                 "================================"
-                "\n"
-                "cycle "
-             << cycle << std::endl;
+             << debug::bg::white << debug::black << endl
+             << "cycle " << cycle << debug::reset << endl;
 
         bool freeze_if = 0;
         bool freeze_id = 0;
+        bool bubble = 0;
 
         /* --------------------- WB stage --------------------- */
         {
@@ -443,6 +443,9 @@ int main() {
         {
             dout << "----------------\nEX\n";
 
+            unsigned operand1;
+            unsigned operand2;
+
             if (!state.EX.nop) {
                 // Mem-Ex hazard control
                 const bool mem_ex_forward_rs =
@@ -453,26 +456,26 @@ int main() {
                     (state.WB.Wrt_reg_addr == state.EX.Rt);
 
                 // Insert bubble between lw-add
-                if (state.EX.rd_mem &&
-                    (mem_ex_forward_rs || mem_ex_forward_rt)) {
-                    freeze_if = 1;  // TODO: fix false-halt
-                    freeze_id = 1;
-                    // create bubble
-                    {
-                        newState.EX.Read_data1 = 0;
-                        newState.EX.Read_data2 = 0;
-                        newState.EX.Imm = 0;
-                        newState.EX.Rs = 0;
-                        newState.EX.Rt = 0;
-                        newState.EX.Wrt_reg_addr = 0;
-                        newState.EX.is_I_type = 0;
-                        newState.EX.rd_mem = 0;
-                        newState.EX.wrt_enable = 0;
-                        newState.EX.alu_op = 0;
-                        newState.EX.wrt_enable = 0;
-                        newState.EX.nop = 0;
-                    }
-                }
+                // if (state.EX.rd_mem &&
+                //     (mem_ex_forward_rs || mem_ex_forward_rt)) {
+                //     freeze_if = 1;  // TODO: fix false-halt
+                //     freeze_id = 1;
+                //     // create bubble
+                //     {
+                //         newState.EX.Read_data1 = 0;
+                //         newState.EX.Read_data2 = 0;
+                //         newState.EX.Imm = 0;
+                //         newState.EX.Rs = 0;
+                //         newState.EX.Rt = 0;
+                //         newState.EX.Wrt_reg_addr = 0;
+                //         newState.EX.is_I_type = 0;
+                //         newState.EX.rd_mem = 0;
+                //         newState.EX.wrt_enable = 0;
+                //         newState.EX.alu_op = 0;
+                //         newState.EX.wrt_enable = 0;
+                //         newState.EX.nop = 0;
+                //     }
+                // }
 
                 // Ex-Ex hazard control
                 const bool ex_ex_forward_rs =
@@ -482,19 +485,84 @@ int main() {
                     state.MEM.wrt_enable &&
                     (state.MEM.Wrt_reg_addr == state.EX.Rt);
 
-                const unsigned operand1 =
-                    mem_ex_forward_rs
-                        ? state.WB.Wrt_data.to_ulong()
-                        : (ex_ex_forward_rs ? state.MEM.ALUresult.to_ulong()
-                                            : state.EX.Read_data1.to_ulong());
-                const unsigned operand2 =
-                    state.EX.is_I_type
-                        ? state.EX.Imm.to_ulong()
-                        : (mem_ex_forward_rt
-                               ? state.WB.Wrt_data.to_ulong()
-                               : (ex_ex_forward_rt
-                                      ? state.MEM.ALUresult.to_ulong()
-                                      : state.EX.Read_data2.to_ulong()));
+                // const unsigned operand1 =
+                //     mem_ex_forward_rs
+                //         ? state.WB.Wrt_data.to_ulong()
+                //         : (ex_ex_forward_rs ? state.MEM.ALUresult.to_ulong()
+                //                             :
+                //                             state.EX.Read_data1.to_ulong());
+                // const unsigned operand2 =
+                //     state.EX.is_I_type
+                //         ? state.EX.Imm.to_ulong()
+                //         : (mem_ex_forward_rt
+                //                ? state.WB.Wrt_data.to_ulong()
+                //                : (ex_ex_forward_rt
+                //                       ? state.MEM.ALUresult.to_ulong()
+                //                       : state.EX.Read_data2.to_ulong()));
+
+                if (ex_ex_forward_rs) {
+                    dout << "EX-EX RS" << endl;
+                    // we might have some forwarding, but first we need to make
+                    // sure previous instruction was add or sub; recall result
+                    // doesn't become available for lw until after the MEM stage
+                    // exexutes
+                    if (state.MEM.wrt_enable &&
+                        !state.MEM.rd_mem) {  // add and sub
+                        operand1 = state.MEM.ALUresult.to_ulong();
+                    }
+
+                    else if (state.MEM.rd_mem) {
+                        dout << "This was a lw --stalling-- at cycle: " << cycle
+                             << endl;
+                        // FIXME:
+                        // we have a lw
+                        // we need to stall one cycle
+                        bubble = 1;
+                        freeze_if = 1;
+                        freeze_id = 1;
+                        // state.IF.nop = 1;
+                        // state.ID.nop = 1;
+                        // state.EX.nop = 1;
+                        // bubble is handled later in the code
+                    }
+                } else if (mem_ex_forward_rs) {  // else if here because EX-EX
+                                                 // takes priority over MEM-EX
+                    dout << "MEM-EX RS" << endl;
+                    if (state.WB.wrt_enable) {
+                        operand1 = state.WB.Wrt_data.to_ulong();
+                    }
+                } else {  // no dependencies detected for operand 1
+                    operand1 = state.EX.Read_data1.to_ulong();
+                }
+
+                if (state.EX.is_I_type) {
+                    operand2 = state.EX.Imm.to_ulong();
+                } else if (ex_ex_forward_rt) {
+                    dout << "EX-EX Rt" << endl;
+                    if (state.MEM.wrt_enable && !state.MEM.rd_mem) {
+                        operand2 = state.MEM.ALUresult.to_ulong();
+                    } else if (state.MEM.rd_mem) {
+                        // we need to stall one cycle
+                        dout << "This was a lw --stalling-- at cycle: " << cycle
+                             << endl;
+                        // FIXME:
+                        bubble = 1;
+                        freeze_if = 1;
+                        freeze_id = 1;
+                        // state.IF.nop = 1;
+                        // state.ID.nop = 1;
+                        // state.EX.nop = 1;
+                        // bubble is handled later in the code
+                    }
+                } else if (mem_ex_forward_rt) {  // else if here because EX-EX
+                                                 // takes priority over MEM-EX
+                    dout << "MEM-EX Rt" << endl;
+                    if (state.WB.wrt_enable) {
+                        operand2 = state.WB.Wrt_data.to_ulong();
+                    }
+                } else {  // no dependencies detected for operand 2
+                    operand2 = state.EX.Read_data2.to_ulong();
+                }
 
                 if (state.EX.alu_op) {
                     newState.MEM.ALUresult = operand1 + operand2;
@@ -512,10 +580,17 @@ int main() {
                 newState.MEM.wrt_mem = state.EX.wrt_mem;
             }
 
-            newState.MEM.nop = state.EX.nop;
+            if (bubble) {
+                newState.MEM.nop = 1;
+                newState.EX.Read_data1 = operand1;
+                newState.EX.Read_data2 = operand2;
+            } else {
+                newState.MEM.nop = state.EX.nop;
+            }
         }
 
         /* --------------------- ID stage --------------------- */
+        bool branch_pc_flag = 0;
         {
             dout << "----------------\nID\n";
             const unsigned instruction = state.ID.Instr.to_ulong();
@@ -579,17 +654,29 @@ int main() {
 
                 if (is_branch) {  // BNE
                     const unsigned relative_addr = sign_extended_imm << 2;
+                    dout << "BNE relative_addr: " << relative_addr << endl;
                     const bool branch_taken =
                         newState.EX.Read_data1 != newState.EX.Read_data2;
 
                     if (branch_taken) {
+                        dout << debug::bg::cyan << "branch " << debug::red
+                             << "taken" << debug::reset
+                             << " PC: " << state.IF.PC.to_ulong();
+
                         state.IF.PC = state.IF.PC.to_ulong() + relative_addr;
-                        freeze_if = 1;
+                        newState.ID.nop = 1;
+                        branch_pc_flag = 1;
+
+                        dout << " -> " << state.IF.PC.to_ulong() << endl;
+                    } else {
+                        dout << debug::bg::cyan << "branch " << debug::red
+                             << "NOT taken" << debug::reset << endl;
                     }
                 }
             }
 
-            newState.EX.nop = state.ID.nop || freeze_id;
+            // newState.EX.nop = state.ID.nop || freeze_id;
+            newState.EX.nop = state.ID.nop;
         }
 
         /* --------------------- IF stage --------------------- */
@@ -610,23 +697,32 @@ int main() {
                          << endl;
 
                     newState.IF.nop = 1;
+                    newState.ID.nop = 1;
                     freeze_if = 1;  // newState.ID.nop = 1; will get overwritten
+                    state.IF.nop = 1;  // HACK: modify the value that's going to
+                                       // overwrite newState.ID.nop
+                } else if (branch_pc_flag) {
+                    newState.IF.PC = state.IF.PC.to_ulong();
                 } else {
                     newState.IF.PC = state.IF.PC.to_ulong() + 4;  // PC = PC + 4
                 }
             }
+            dout << endl
+                 << "(old) " << state.IF.PC.to_ulong() << " -> "
+                 << newState.IF.PC.to_ulong() << " (new)" << endl;
 
-            newState.ID.nop = state.IF.nop || freeze_if;
+            // newState.ID.nop = state.IF.nop || freeze_if;
+            newState.ID.nop = state.IF.nop;
         }
 
         //////////////////////////////////////////////////////////
         {
             dout << "----------------\n";
             dout << "NOP old: ";
-            dout << (state.IF.nop ? debug::red : debug::reset) << "IF"
-                 << debug::reset << " ";
-            dout << (state.ID.nop ? debug::red : debug::reset) << "ID"
-                 << debug::reset << " ";
+            dout << ((state.IF.nop || freeze_if) ? debug::red : debug::reset)
+                 << "IF" << debug::reset << " ";
+            dout << ((state.ID.nop || freeze_id) ? debug::red : debug::reset)
+                 << "ID" << debug::reset << " ";
             dout << (state.EX.nop ? debug::red : debug::reset) << "EX"
                  << debug::reset << " ";
             dout << (state.MEM.nop ? debug::red : debug::reset) << "MEM"
