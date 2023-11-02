@@ -35,6 +35,11 @@ using namespace std;
 #define RM_AND_NOWRITEMEM 9
 #define RM_AND_WRITEMEM 10
 
+#define WH_AND_NOWRITEMEM 11
+#define WH_AND_WRITEMEM 12
+#define WM_AND_NOWRITEMEM 13
+#define WM_AND_WRITEMEM 14
+
 struct config
 {
     int L1blocksize;
@@ -61,7 +66,7 @@ struct CacheBlock
     // or else it would have looked something like this: vector<number of bytes> Data; 
     bool valid = 0;
     bool dirty = 0;
-    int tag;
+    unsigned int tag;
 };
 
 /*
@@ -85,40 +90,40 @@ class CacheSystem
     // cache L1 or L2
 public:
     CacheSystem(int L1_block_size, int L1_associativity, int L1_cache_size, 
-          int L2_block_size, int L2_associativuty, int L2_cache_size) : 
+          int L2_block_size, int L2_associativity, int L2_cache_size) : 
     L1_block_size(L1_block_size), L1_associativity(L1_associativity), L1_cache_size(L1_cache_size), 
     L2_block_size(L2_block_size), L2_associativity(L2_associativity), L2_cache_size(L2_cache_size) {
         // initialize the L1 cache according to cache parameters
         L1_num_sets = (L1_cache_size * 1024)/(power(2, L1_block_size) * L1_associativity);
-        for(size_t i=0; i<L1_num_sets; ++i){
+        for(int i=0; i<L1_num_sets; ++i){
             L1_rows.push_back(new Set());
-            for(size_t j=0; j<L1_associativity; ++j){
+            for(int j=0; j<L1_associativity; ++j){
                 L1_rows[L1_rows.size()-1]->set_blocks.push_back(CacheBlock());
             }
         }
         //initialize the L2 cache according to cache parameters
         L2_num_sets = (L2_cache_size * 1024)/(power(2, L2_block_size) * L2_associativity);
-        for(size_t i=0; i<L2_num_sets; ++i){
+        for(int i=0; i<L2_num_sets; ++i){
             L2_rows.push_back(new Set());
-            for(size_t j=0; j<L2_associativity; ++j){
+            for(int j=0; j<L2_associativity; ++j){
                 L2_rows[L2_rows.size()-1]->set_blocks.push_back(CacheBlock());
             }
         }
     }
 
     ~CacheSystem(){
-        for(size_t i=0; i<L1_num_sets; ++i){
+        for(int i=0; i<L1_num_sets; ++i){
             delete L1_rows[i];
         }
         L1_rows.clear();
 
-        for(size_t i=0; i<L2_num_sets; ++i){
+        for(int i=0; i<L2_num_sets; ++i){
             delete L2_rows[i];
         }
         L2_rows.clear();
     }
 
-    auto write(auto addr){
+    int writeL1(uint32_t addr){
         /*
         step 1: select the set in our L1 cache using set index bits
         step 2: iterate through each way in the current set
@@ -128,9 +133,22 @@ public:
 
         return WH or WM
         */
+        uint32_t L1_block_size_bits = log2(L1_block_size);
+        uint32_t L1_set_bits = log2(L1_num_sets);
+        uint32_t L1_tag = addr >> (L1_block_size_bits + L1_set_bits);
+        uint32_t L1_row = (addr >> L1_block_size_bits)%(L1_num_sets);
+        for(int i=0; i<L1_associativity; ++i){
+            if((L1_tag == L1_rows[L1_row]->set_blocks[i].tag) && (L1_rows[L1_row]->set_blocks[i].valid == 1)){
+                //We have a write hit; set dirty bit to 1
+                L1_rows[L1_row]->set_blocks[i].dirty = 1;
+                return WH;
+            }
+        }
+        //We have a write miss
+        return WM;
     }
 
-    auto writeL2(auto addr){
+    int writeL2(uint32_t addr){
         /*
         step 1: select the set in our L2 cache using set index bits
         step 2: iterate through each way in the current set
@@ -140,6 +158,20 @@ public:
 
         return {WM or WH, WRITEMEM or NOWRITEMEM}
         */
+        uint32_t L2_block_size_bits = log2(L2_block_size);
+        uint32_t L2_row_bits = log2(L2_num_sets);
+        uint32_t L2_tag = addr >> (L2_block_size_bits + L2_row_bits);
+        uint32_t L2_row = (addr >> L2_block_size_bits)%(L2_num_sets);
+        for(int i=0; i<L2_associativity; ++i){
+            if((L2_tag == L2_rows[L2_row]->set_blocks[i].tag) && (L2_rows[L2_row]->set_blocks[i].valid == 1)){
+                //We have an L2 cache hit, set dirty bit to 1
+                L2_rows[L2_row]->set_blocks[i].dirty = 1;
+                //for write hit, we do not write to memory
+                return WH;
+            }
+        }
+        //We have a write miss, we write to memory
+        return WM;
     }
 
     int readL1(uint32_t addr){
@@ -151,12 +183,12 @@ public:
 
         return RH or RM
         */
-        uint32_t block_size_bits = log2(L1_block_size);
-        uint32_t set_bits = log2(L1_num_sets);
-        uint32_t tag = addr >> (block_size_bits + set_bits);
-        uint32_t row = (addr >> block_size_bits)%(L1_num_sets);
-        for(size_t i=0; i<L1_associativity; ++i){
-            if((tag == L1_rows[row]->set_blocks[i].tag) && (L1_rows[row]->set_blocks[i].valid == 1)){
+        uint32_t L1_block_size_bits = log2(L1_block_size);
+        uint32_t L1_set_bits = log2(L1_num_sets);
+        uint32_t L1_tag = addr >> (L1_block_size_bits + L1_set_bits);
+        uint32_t L1_row = (addr >> L1_block_size_bits)%(L1_num_sets);
+        for(int i=0; i<L1_associativity; ++i){
+            if((L1_tag == L1_rows[L1_row]->set_blocks[i].tag) && (L1_rows[L1_row]->set_blocks[i].valid == 1)){
                 //We have a cache hit; do nothing
                 return RH;
             }
@@ -184,7 +216,7 @@ public:
         uint32_t L2_row_bits = log2(L2_num_sets);
         uint32_t L2_tag = addr >> (L2_block_size_bits + L2_row_bits);
         uint32_t L2_row = (addr >> L2_block_size_bits)%(L2_num_sets);
-        for(size_t i=0; i<L2_associativity; ++i){
+        for(int i=0; i<L2_associativity; ++i){
             if((L2_tag == L2_rows[L2_row]->set_blocks[i].tag) && (L2_rows[L2_row]->set_blocks[i].valid == 1)){
                 //We have a cache hit; move L2 data to L1
                 L2_rows[L2_row]->set_blocks[i].valid = 0;
@@ -419,6 +451,20 @@ int main(int argc, char *argv[])
                 //     L2AcceState, MemAcceState = cache.writeL2(addr);
                 // }
                 // else if(){...}
+                L1AcceState = cache.writeL1(addr);
+                if(L1AcceState == WH){
+                    L2AcceState = NA;
+                    MemAcceState = NOWRITEMEM;
+                }
+                else{
+                    L2AcceState = cache.writeL2(addr);
+                    if(L2AcceState == WH){
+                        MemAcceState = NOWRITEMEM;
+                    }
+                    else{
+                        MemAcceState = WRITEMEM;
+                    }
+                }
             }
 /*********************************** ↑↑↑ Todo: Implement by you ↑↑↑ ******************************************/
 
