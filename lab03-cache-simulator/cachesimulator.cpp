@@ -162,6 +162,20 @@ public:
         uint32_t L2_row_bits = log2(L2_num_sets);
         uint32_t L2_tag = addr >> (L2_block_size_bits + L2_row_bits);
         uint32_t L2_row = (addr >> L2_block_size_bits)%(L2_num_sets);
+
+
+        //Debugging only
+        // uint32_t L1_block_size_bits = log2(L1_block_size);
+        // uint32_t L1_set_bits = log2(L1_num_sets);
+        // uint32_t L1_tag = addr >> (L1_block_size_bits + L1_set_bits);
+        // uint32_t L1_row = (addr >> L1_block_size_bits)%(L1_num_sets);
+        // for(int i=0; i<L2_associativity; ++i){
+        //     cout << L1_rows[L1_row]->set_blocks[i].valid << " ";
+        // }
+        // cout << endl;
+        /////////////////////////////////////////////////////////////////////
+
+
         for(int i=0; i<L2_associativity; ++i){
             if((L2_tag == L2_rows[L2_row]->set_blocks[i].tag) && (L2_rows[L2_row]->set_blocks[i].valid == 1)){
                 //We have an L2 cache hit, set dirty bit to 1
@@ -216,12 +230,25 @@ public:
         uint32_t L2_row_bits = log2(L2_num_sets);
         uint32_t L2_tag = addr >> (L2_block_size_bits + L2_row_bits);
         uint32_t L2_row = (addr >> L2_block_size_bits)%(L2_num_sets);
+
+        //Debugging only
+        // uint32_t L1_block_size_bits = log2(L1_block_size);
+        // uint32_t L1_set_bits = log2(L1_num_sets);
+        // uint32_t L1_tag = addr >> (L1_block_size_bits + L1_set_bits);
+        // uint32_t L1_row = (addr >> L1_block_size_bits)%(L1_num_sets);
+        // for(int i=0; i<L2_associativity; ++i){
+        //     cout << L1_rows[L1_row]->set_blocks[i].valid << " ";
+        // }
+        // cout << endl;
+        /////////////////////////////////////////////////////////////////////
+
         for(int i=0; i<L2_associativity; ++i){
             if((L2_tag == L2_rows[L2_row]->set_blocks[i].tag) && (L2_rows[L2_row]->set_blocks[i].valid == 1)){
                 //We have a cache hit; move L2 data to L1
                 L2_rows[L2_row]->set_blocks[i].valid = 0;
                 bool write_to_mem = move_to_L1(L2_rows[L2_row]->set_blocks[i], addr);
                 if(write_to_mem){
+                    //cout << " This should only appear if wrtie_to_mem = 1" << endl;
                     return RH_AND_WRITEMEM;
                 }
                 else{
@@ -233,11 +260,13 @@ public:
         CacheBlock data_from_mem;
         bool write_to_mem = move_to_L1(data_from_mem, addr);
         if(write_to_mem){
+            //cout << " This should only appear if write_to_mem = 1" << endl;
             return RM_AND_WRITEMEM;
         }
         else{
             return RM_AND_NOWRITEMEM;
         }
+
     }
 
     bool move_to_L1(const CacheBlock cache_block, const uint32_t addr){
@@ -416,27 +445,33 @@ int main(int argc, char *argv[])
                 //     L2AcceState, MemAcceState = cache.readL2(addr); // if L1 read miss, read L2
                 // }
                 // else{ ... }
+                //cout << xaddr << ": ";
                 L1AcceState = cache.readL1(addr);
-                if(L1AcceState == RM){
-                    int state = cache.readL2(addr);
-                    switch(state){
-                        case RH_AND_NOWRITEMEM:
-                            L2AcceState = RH;
-                            MemAcceState = NOWRITEMEM;
-                        case RH_AND_WRITEMEM:
-                            L2AcceState = RH;
-                            MemAcceState = WRITEMEM;
-                        case RM_AND_NOWRITEMEM:
-                            L2AcceState = RM;
-                            MemAcceState = NOWRITEMEM;
-                        case RM_AND_WRITEMEM:
-                            L2AcceState = RM;
-                            MemAcceState = WRITEMEM;
-                    }
-                }
-                else{
+                if(L1AcceState == RH){
                     L2AcceState = NA;
                     MemAcceState = NOWRITEMEM;
+                }
+
+                else{
+                    int state = cache.readL2(addr);
+                    //cout << " The state we are returning for L2 and Mem is: " << state << endl;
+                    if(state == RH_AND_NOWRITEMEM){
+                        L2AcceState = RH;
+                        MemAcceState = NOWRITEMEM;
+                    }
+                    else if(state == RH_AND_WRITEMEM){
+                        L2AcceState = RH;
+                        MemAcceState = WRITEMEM;
+                    }
+                    else if(state == RM_AND_NOWRITEMEM){
+                        L2AcceState = RM;
+                        MemAcceState = NOWRITEMEM;
+                        //cout << " MemAcceState in case 9 statement is: " << MemAcceState << endl;
+                    }
+                    else{
+                        L2AcceState = RM;
+                        MemAcceState = WRITEMEM;
+                    }
                 }
             }
             else{ // a Write request
@@ -466,6 +501,8 @@ int main(int argc, char *argv[])
                     }
                 }
             }
+            //cout << " The MemAccessState we are outputting is: " << MemAcceState << endl;
+
 /*********************************** ↑↑↑ Todo: Implement by you ↑↑↑ ******************************************/
 
 
