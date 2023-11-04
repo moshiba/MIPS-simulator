@@ -96,32 +96,31 @@ public:
         // initialize the L1 cache according to cache parameters
         L1_num_sets = (L1_cache_size * 1024)/(L1_block_size * L1_associativity);
         for(int i=0; i<L1_num_sets; ++i){
-            L1_rows.push_back(new Set());
+            L1_cache.push_back(new Set());
             for(int j=0; j<L1_associativity; ++j){
-                L1_rows[L1_rows.size()-1]->set_blocks.push_back(CacheBlock());
+                L1_cache[L1_cache.size()-1]->set_blocks.push_back(CacheBlock());
             }
         }
-        cout << "L1_num_sets: " << L1_num_sets << endl;
         //initialize the L2 cache according to cache parameters
         L2_num_sets = (L2_cache_size * 1024)/(L2_block_size * L2_associativity);
         for(int i=0; i<L2_num_sets; ++i){
-            L2_rows.push_back(new Set());
+            L2_cache.push_back(new Set());
             for(int j=0; j<L2_associativity; ++j){
-                L2_rows[L2_rows.size()-1]->set_blocks.push_back(CacheBlock());
+                L2_cache[L2_cache.size()-1]->set_blocks.push_back(CacheBlock());
             }
         }
     }
 
     ~CacheSystem(){
         for(int i=0; i<L1_num_sets; ++i){
-            delete L1_rows[i];
+            delete L1_cache[i];
         }
-        L1_rows.clear();
+        L1_cache.clear();
 
         for(int i=0; i<L2_num_sets; ++i){
-            delete L2_rows[i];
+            delete L2_cache[i];
         }
-        L2_rows.clear();
+        L2_cache.clear();
     }
 
     int writeL1(uint32_t addr){
@@ -139,9 +138,9 @@ public:
         uint32_t L1_tag = addr >> (L1_block_size_bits + L1_set_bits);
         uint32_t L1_row = (addr >> L1_block_size_bits)%(L1_num_sets);
         for(int i=0; i<L1_associativity; ++i){
-            if((L1_tag == L1_rows[L1_row]->set_blocks[i].tag) && (L1_rows[L1_row]->set_blocks[i].valid == 1)){
+            if((L1_tag == L1_cache[L1_row]->set_blocks[i].tag) && (L1_cache[L1_row]->set_blocks[i].valid == 1)){
                 //We have a write hit; set dirty bit to 1
-                L1_rows[L1_row]->set_blocks[i].dirty = 1;
+                L1_cache[L1_row]->set_blocks[i].dirty = 1;
                 return WH;
             }
         }
@@ -164,23 +163,12 @@ public:
         uint32_t L2_tag = addr >> (L2_block_size_bits + L2_row_bits);
         uint32_t L2_row = (addr >> L2_block_size_bits)%(L2_num_sets);
 
-
         //Debugging only
-        // uint32_t L1_block_size_bits = log2(L1_block_size);
-        // uint32_t L1_set_bits = log2(L1_num_sets);
-        // uint32_t L1_tag = addr >> (L1_block_size_bits + L1_set_bits);
-        // uint32_t L1_row = (addr >> L1_block_size_bits)%(L1_num_sets);
-        // for(int i=0; i<L2_associativity; ++i){
-        //     cout << L1_rows[L1_row]->set_blocks[i].valid << " ";
-        // }
-        // cout << endl;
-        /////////////////////////////////////////////////////////////////////
-
 
         for(int i=0; i<L2_associativity; ++i){
-            if((L2_tag == L2_rows[L2_row]->set_blocks[i].tag) && (L2_rows[L2_row]->set_blocks[i].valid == 1)){
+            if((L2_tag == L2_cache[L2_row]->set_blocks[i].tag) && (L2_cache[L2_row]->set_blocks[i].valid == 1)){
                 //We have an L2 cache hit, set dirty bit to 1
-                L2_rows[L2_row]->set_blocks[i].dirty = 1;
+                L2_cache[L2_row]->set_blocks[i].dirty = 1;
                 //for write hit, we do not write to memory
                 return WH;
             }
@@ -202,8 +190,12 @@ public:
         uint32_t L1_set_bits = log2(L1_num_sets);
         uint32_t L1_tag = addr >> (L1_block_size_bits + L1_set_bits);
         uint32_t L1_row = (addr >> L1_block_size_bits)%(L1_num_sets);
+
+        //Debugging only
+        cout << "L1 currently has tag: " << L1_cache[0]->set_blocks[0].tag << " at row 0" << endl;
+
         for(int i=0; i<L1_associativity; ++i){
-            if((L1_tag == L1_rows[L1_row]->set_blocks[i].tag) && (L1_rows[L1_row]->set_blocks[i].valid == 1)){
+            if((L1_tag == L1_cache[L1_row]->set_blocks[i].tag) && (L1_cache[L1_row]->set_blocks[i].valid == 1)){
                 //We have a cache hit; do nothing
                 return RH;
             }
@@ -232,24 +224,16 @@ public:
         uint32_t L2_tag = addr >> (L2_block_size_bits + L2_row_bits);
         uint32_t L2_row = (addr >> L2_block_size_bits)%(L2_num_sets);
 
+
         //Debugging only
-        // uint32_t L1_block_size_bits = log2(L1_block_size);
-        // uint32_t L1_set_bits = log2(L1_num_sets);
-        // uint32_t L1_tag = addr >> (L1_block_size_bits + L1_set_bits);
-        // uint32_t L1_row = (addr >> L1_block_size_bits)%(L1_num_sets);
-        // for(int i=0; i<L2_associativity; ++i){
-        //     cout << L1_rows[L1_row]->set_blocks[i].valid << " ";
-        // }
-        // cout << endl;
-        /////////////////////////////////////////////////////////////////////
+        cout << "L2 currently has tag: " << L2_cache[0]->set_blocks[0].tag << " at row 0" << endl;
 
         for(int i=0; i<L2_associativity; ++i){
-            if((L2_tag == L2_rows[L2_row]->set_blocks[i].tag) && (L2_rows[L2_row]->set_blocks[i].valid == 1)){
+            if((L2_tag == L2_cache[L2_row]->set_blocks[i].tag) && (L2_cache[L2_row]->set_blocks[i].valid == 1)){
                 //We have a cache hit; move L2 data to L1
-                L2_rows[L2_row]->set_blocks[i].valid = 0;
-                bool write_to_mem = move_to_L1(L2_rows[L2_row]->set_blocks[i], addr);
+                L2_cache[L2_row]->set_blocks[i].valid = 0;
+                bool write_to_mem = move_to_L1(L2_cache[L2_row]->set_blocks[i], addr);
                 if(write_to_mem){
-                    //cout << " This should only appear if wrtie_to_mem = 1" << endl;
                     return RH_AND_WRITEMEM;
                 }
                 else{
@@ -261,7 +245,6 @@ public:
         CacheBlock data_from_mem;
         bool write_to_mem = move_to_L1(data_from_mem, addr);
         if(write_to_mem){
-            //cout << " This should only appear if write_to_mem = 1" << endl;
             return RM_AND_WRITEMEM;
         }
         else{
@@ -274,17 +257,24 @@ public:
         bool write_to_mem = 0;
         uint32_t L1_block_size_bits = log2(L1_block_size);
         uint32_t L1_row_bits = log2(L1_num_sets);
-        uint32_t L1_tag = addr >> (L1_block_size_bits + L1_row_bits);
+        uint32_t L1_new_tag = addr >> (L1_block_size_bits + L1_row_bits);
         uint32_t L1_row = (addr >> L1_block_size_bits)%(L1_num_sets);
-        int counter = L1_rows[L1_row]->counter;
+        int counter = L1_cache[L1_row]->counter;
         //if full, evict to L2 first then move new block
         if(is_L1_row_full(L1_row)){
-            write_to_mem = move_to_L2(L1_rows[L1_row]->set_blocks[counter], addr);
+            //We need to calculate the address of the current L1 tag at the specified row
+            //in order to evict it
+            //uint32_t L1_tag_bits = 32 - (L1_block_size_bits + L1_row_bits);
+            uint32_t L1_old_tag = L1_cache[L1_row]->set_blocks[counter].tag;
+            uint32_t L1_old_addr = (L1_old_tag << (L1_row_bits + L1_block_size_bits)) | 
+            (L1_row << L1_block_size_bits) | (power(2, L1_block_size_bits)-1);
+            cout << "The address to be passed to L2 is: " << L1_old_addr << endl;
+            write_to_mem = move_to_L2(L1_cache[L1_row]->set_blocks[counter], L1_old_addr);
         }
-        L1_rows[L1_row]->set_blocks[counter] = cache_block;
-        L1_rows[L1_row]->set_blocks[counter].valid = 1;
-        L1_rows[L1_row]->set_blocks[counter].tag = L1_tag;
-        L1_rows[L1_row]->counter = (L1_rows[L1_row]->counter + 1) % L1_associativity;
+        L1_cache[L1_row]->set_blocks[counter] = cache_block;
+        L1_cache[L1_row]->set_blocks[counter].valid = 1;
+        L1_cache[L1_row]->set_blocks[counter].tag = L1_new_tag;
+        L1_cache[L1_row]->counter = (counter + 1) % L1_associativity;
         return write_to_mem;
     }
 
@@ -294,28 +284,31 @@ public:
         uint32_t L2_row_bits = log2(L2_num_sets);
         uint32_t L2_tag = addr >> (L2_block_size_bits + L2_row_bits);
         uint32_t L2_row = (addr >> L2_block_size_bits)%(L2_num_sets);
-        int counter = L2_rows[L2_row]->counter;
+        int counter = L2_cache[L2_row]->counter;
         //if full, evict to memory first then move new block
         if(is_L2_row_full(L2_row)){
-            //for now the eviction is just changing the valid bit
-            L2_rows[L2_row]->set_blocks[counter].valid = 0;
-            write_to_mem = 1;
-            L2_rows[L2_row]->counter = (L2_rows[L2_row]->counter + 1) % L2_associativity;
+            //eviction is just changing the valid bit
+            L2_cache[L2_row]->set_blocks[counter].valid = 0;
+            if(L2_cache[L2_row]->set_blocks[counter].dirty){
+                //if dirty bit is 1, then we need to write the data into memory
+                write_to_mem = 1;
+            }
+            L2_cache[L2_row]->counter = (counter + 1) % L2_associativity;
         }
-        L2_rows[L2_row]->set_blocks[counter] = cache_block;
-        L2_rows[L2_row]->set_blocks[counter].valid = 1;
-        L2_rows[L2_row]->set_blocks[counter].tag = L2_tag;
+        L2_cache[L2_row]->set_blocks[counter] = cache_block;
+        L2_cache[L2_row]->set_blocks[counter].valid = 1;
+        L2_cache[L2_row]->set_blocks[counter].tag = L2_tag;
         return write_to_mem;
     }
 
 private:
-    vector<Set*> L1_rows;
+    vector<Set*> L1_cache;
     int L1_block_size;
     int L1_associativity;
     int L1_cache_size;
     int L1_num_sets;
 
-    vector<Set*> L2_rows;
+    vector<Set*> L2_cache;
     int L2_block_size;
     int L2_associativity;
     int L2_cache_size;
@@ -324,7 +317,7 @@ private:
     //Function for detrmining whether a cache row is full or not, used for eviction
     bool is_L1_row_full(int row){
         for(int i=0; i<L1_associativity; ++i){
-            if(L1_rows[row]->set_blocks[i].valid == 0){
+            if(L1_cache[row]->set_blocks[i].valid == 0){
                 return 0;
             }
         }
@@ -333,7 +326,7 @@ private:
 
     bool is_L2_row_full(int row){
         for(int i=0; i<L2_associativity; ++i){
-            if(L2_rows[row]->set_blocks[i].valid == 0){
+            if(L2_cache[row]->set_blocks[i].valid == 0){
                 return 0;
             }
         }
@@ -446,7 +439,7 @@ int main(int argc, char *argv[])
                 //     L2AcceState, MemAcceState = cache.readL2(addr); // if L1 read miss, read L2
                 // }
                 // else{ ... }
-                //cout << xaddr << ": ";
+                cout << xaddr << ": " << endl;
                 L1AcceState = cache.readL1(addr);
                 if(L1AcceState == RH){
                     L2AcceState = NA;
@@ -455,7 +448,6 @@ int main(int argc, char *argv[])
 
                 else{
                     int state = cache.readL2(addr);
-                    //cout << " The state we are returning for L2 and Mem is: " << state << endl;
                     if(state == RH_AND_NOWRITEMEM){
                         L2AcceState = RH;
                         MemAcceState = NOWRITEMEM;
@@ -467,7 +459,6 @@ int main(int argc, char *argv[])
                     else if(state == RM_AND_NOWRITEMEM){
                         L2AcceState = RM;
                         MemAcceState = NOWRITEMEM;
-                        //cout << " MemAcceState in case 9 statement is: " << MemAcceState << endl;
                     }
                     else{
                         L2AcceState = RM;
@@ -502,7 +493,6 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            //cout << " The MemAccessState we are outputting is: " << MemAcceState << endl;
 
 /*********************************** ↑↑↑ Todo: Implement by you ↑↑↑ ******************************************/
 
