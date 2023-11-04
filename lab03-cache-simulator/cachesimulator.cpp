@@ -94,15 +94,16 @@ public:
     L1_block_size(L1_block_size), L1_associativity(L1_associativity), L1_cache_size(L1_cache_size), 
     L2_block_size(L2_block_size), L2_associativity(L2_associativity), L2_cache_size(L2_cache_size) {
         // initialize the L1 cache according to cache parameters
-        L1_num_sets = (L1_cache_size * 1024)/(power(2, L1_block_size) * L1_associativity);
+        L1_num_sets = (L1_cache_size * 1024)/(L1_block_size * L1_associativity);
         for(int i=0; i<L1_num_sets; ++i){
             L1_rows.push_back(new Set());
             for(int j=0; j<L1_associativity; ++j){
                 L1_rows[L1_rows.size()-1]->set_blocks.push_back(CacheBlock());
             }
         }
+        cout << "L1_num_sets: " << L1_num_sets << endl;
         //initialize the L2 cache according to cache parameters
-        L2_num_sets = (L2_cache_size * 1024)/(power(2, L2_block_size) * L2_associativity);
+        L2_num_sets = (L2_cache_size * 1024)/(L2_block_size * L2_associativity);
         for(int i=0; i<L2_num_sets; ++i){
             L2_rows.push_back(new Set());
             for(int j=0; j<L2_associativity; ++j){
