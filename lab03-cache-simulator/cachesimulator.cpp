@@ -118,14 +118,20 @@ struct CacheBlock {
     /*
      * a single cache block:
      *   - valid bit (is the data in the block valid?)
-     *   - dirty bit (has the data in the block been modified by means of a write?)
+     *   - dirty bit (has the data in the block been modified by means of a
+     * write?)
      *   - tag (the tag bits of the address)
-     *   - data (the actual data stored in the block, in our case, we don't need to store the data)
+     *   - data (the actual data stored in the block, in our case, we don't need
+     * to store the data)
      *
      * we don't actually need to allocate space for data, because we only need
      * to simulate the cache action or else it would have looked something like
      * this: array<number of bytes> Data;
-    */
+     */
+    CacheBlock(unsigned tag_, bool valid_, bool dirty_)
+        : tag(tag_), valid(valid_), dirty(dirty_) {}
+    CacheBlock() : CacheBlock(0, 0, 0) {}
+
     unsigned tag;
     bool valid;
     bool dirty;
