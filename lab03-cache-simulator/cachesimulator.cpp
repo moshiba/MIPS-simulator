@@ -34,6 +34,7 @@ The 32 bit address is divided into
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #ifdef DEBUG
@@ -105,7 +106,10 @@ using namespace std;
 #define NOWRITEMEM 5  // no write to memory
 #define WRITEMEM 6    // write to memory
 
-struct config {
+enum class read_request { hit = RH, miss = RM };
+enum class write_request { hit = WH, miss = WM };
+
+struct Config {
     int L1blocksize;
     int L1setsize;
     int L1size;
@@ -175,29 +179,124 @@ struct CacheSet {
 };
 
 class Cache {
-    CacheSet* cache_set;
+    std::vector< CacheSet > cache_set;
 
    public:
-    auto read_access(unsigned addr){};
-    auto write_access(unsigned addr){};
-    auto check_exist(unsigned addr){};
-    auto evict(unsigned addr){};
+    Cache(int num_sets_, int ways_) : sets({CacheSet(ways_)}) {
+        sets.resize(num_sets_, CacheSet(ways_));
+    }
+
+    read_request read(unsigned addr){
+        // TODO
+
+    };
+    write_request write(unsigned addr){
+        // TODO
+    };
+    bool check_exist(unsigned addr){
+        // TODO
+    };
+    auto evict(unsigned addr){
+        // TODO
+    };
+
+    std::vector< CacheSet > sets;
 };
+
+constexpr auto bitmask(unsigned n) { return (1UL << (n + 1)) - 1; }
+
+template < int level_ >
+class CacheAddress {
+    /*
+     * |------------------------|
+     * |         32-bit         |
+     * | <tag> <index> <offset> |
+     * |------------------------|
+     *
+     * Fields
+     * - tag bits (t)
+     *      - t = 32-s-b
+     * - set index bits (s)
+     *      - s = log2(#sets)
+     * - block offset bits (b)
+     *      - b = log2(block size in bytes)
+     */
+   public:
+    CacheAddress(int block_size, int set_size_, int total_size_)
+        : index_size(std::lround(
+              std::ceil(std::log2(total_size_ * 1024 / set_size_)))),
+          offset_size(std::lround(std::ceil(std::log2(block_size)))),
+          tag_size(32 - index_size - offset_size) {
+        dout << "L" << level << " cfg:  <size " << total_size_
+             << " KiB> / <associativity " << set_size_ << "> / <block size "
+             << block_size << ">" << endl;
+        dout << "L" << level << " addr: <tag " << tag_size << "> / <index "
+             << index_size << "> / <offset " << offset_size << ">" << endl;
+    }
+
+    auto parse(unsigned address) {
+        return std::make_tuple(
+            // tag bits
+            (address >> (offset_size + index_size)) & bitmask(tag_size),
+            // index bits
+            (address >> offset_size) & bitmask(index_size),
+            // offset bits
+            address & bitmask(offset_size));
+    }
+
+    const decltype(level_) level = level_;
+
+    int index_size;
+    int offset_size;
+    int tag_size;
+};
+using L1Address_t = CacheAddress< 1 >;
+using L2Address_t = CacheAddress< 2 >;
+
 class CacheSystem {
-    Cache L1;
-    Cache L2;
-
    public:
-    int L1AcceState, L2AcceState, MemAcceState;
-    auto read(unsigned addr){};
-    auto write(unsigned addr){};
-};
+    CacheSystem(Config cfg)
+        : l1_cache(cfg.L1size / cfg.L1blocksize / cfg.L1setsize, cfg.L1setsize),
+          l2_cache(cfg.L2size / cfg.L2blocksize / cfg.L2setsize, cfg.L2setsize),
+          l1_address(cfg.L1blocksize, cfg.L1setsize, cfg.L1size),
+          l2_address(cfg.L2blocksize, cfg.L2setsize, cfg.L2size) {}
 
-/*********************************** ↑↑↑ TODO: Implement by you ↑↑↑
- * ******************************************/
+    auto read(unsigned addr) {
+        if (l1_cache.read(addr) == read_request::hit) {
+            return make_tuple(RH, NA, NOWRITEMEM);
+        } else {
+            if (l2_cache.read(addr) == read_request::hit) {
+                bool evict_to_mem;  // TODO: evict L2 to memory
+                return make_tuple(RM, RH, evict_to_mem ? WRITEMEM : NOWRITEMEM);
+            } else {
+                bool evict_to_mem;  // TODO: evict L2 to memory
+                return make_tuple(RM, RM, evict_to_mem ? WRITEMEM : NOWRITEMEM);
+            }
+        }
+    };
+
+    auto write(unsigned addr) {
+        if (l1_cache.write(addr) == write_request::hit) {
+            return make_tuple(WH, NA, NOWRITEMEM);
+        } else {
+            if (l2_cache.write(addr) == write_request::hit) {
+                // TODO: evict ?
+                return make_tuple(WM, WH, NOWRITEMEM);
+            } else {
+                // TODO: evict ?
+                return make_tuple(WM, WM, WRITEMEM);
+            }
+        }
+    };
+
+    Cache l1_cache;
+    Cache l2_cache;
+    L1Address_t l1_address;
+    L2Address_t l2_address;
+};
 
 int main(int argc, char* argv[]) {
-    config cacheconfig;
+    Config cacheconfig;
     {
         ifstream cache_params;
         string dummyLine;
@@ -217,90 +316,45 @@ int main(int argc, char* argv[]) {
 
     ifstream traces;
     ofstream tracesout;
-    string outname;
-    outname = string(argv[2]) + ".out";
+    const auto outname = string(argv[2]) + ".out";
     traces.open(argv[2]);
     tracesout.open(outname.c_str());
-    string line;
-    string accesstype;  // the Read/Write access type from the memory trace;
-    string xaddr;       // the address from the memory trace store in hex;
-    unsigned int
-        addr;  // the address from the memory trace store in unsigned int;
-    bitset< 32 >
-        accessaddr;  // the address from the memory trace store in the bitset;
 
-    /*********************************** ↓↓↓ TODO: Implement by you ↓↓↓
-     * ******************************************/
-    // Implement by you:
-    // initialize the hirearch cache system with those configs
-    // probably you may define a Cache class for L1 and L2, or any data
-    // structure you like
     if (cacheconfig.L1blocksize != cacheconfig.L2blocksize) {
         printf("please test with the same block size\n");
         return 1;
     }
-    // cache c1(cacheconfig.L1blocksize, cacheconfig.L1setsize,
-    // cacheconfig.L1size,
-    //          cacheconfig.L2blocksize, cacheconfig.L2setsize,
-    //          cacheconfig.L2size);
 
-    int L1AcceState =
-        NA;  // L1 access state variable, can be one of NA, RH, RM, WH, WM;
-    int L2AcceState =
-        NA;  // L2 access state variable, can be one of NA, RH, RM, WH, WM;
-    int MemAcceState = NOWRITEMEM;  // Main Memory access state variable, can be
-                                    // either NA or WH;
+    CacheSystem cache_sys(cacheconfig);
 
     if (traces.is_open() && tracesout.is_open()) {
-        while (
-            getline(traces, line)) {  // read mem access file and access Cache
+        string line;
+        while (getline(traces,
+                       line)) {  // read mem access file and access Cache
+
+            string accesstype;
+            unsigned int addr;
+            bitset< 32 > access_addr;
+            string hex_addr;
 
             istringstream iss(line);
-            if (!(iss >> accesstype >> xaddr)) {
+            if (!(iss >> accesstype >> hex_addr)) {
                 break;
             }
-            stringstream saddr(xaddr);
+            stringstream saddr(hex_addr);
             saddr >> std::hex >> addr;
-            accessaddr = bitset< 32 >(addr);
+            access_addr = bitset< 32 >(addr);
 
             // access the L1 and L2 Cache according to the trace;
-            if (accesstype.compare("R") == 0)  // a Read request
-            {
-                // Implement by you:
-                //   read access to the L1 Cache,
-                //   and then L2 (if required),
-                //   update the access state variable;
-                //   return: L1AcceState L2AcceState MemAcceState
-
-                // For example:
-                // L1AcceState = cache.readL1(addr); // read L1
-                // if(L1AcceState == RM){
-                //     L2AcceState, MemAcceState = cache.readL2(addr); // if L1
-                //     read miss, read L2
-                // }
-                // else{ ... }
-            } else {  // a Write request
-                // Implement by you:
-                //   write access to the L1 Cache, or L2 / main MEM,
-                //   update the access state variable;
-                //   return: L1AcceState L2AcceState
-
-                // For example:
-                // L1AcceState = cache.writeL1(addr);
-                // if (L1AcceState == WM){
-                //     L2AcceState, MemAcceState = cache.writeL2(addr);
-                // }
-                // else if(){...}
+            if (accesstype.compare("R") == 0) {
+                const auto& [l1_ret, l2_ret, mem_ret] = cache_sys.read(addr);
+                // Output hit/miss results for L1 and L2 to the output file;
+                tracesout << l1_ret << " " << l2_ret << " " << mem_ret << endl;
+            } else {
+                const auto& [l1_ret, l2_ret, mem_ret] = cache_sys.write(addr);
+                // Output hit/miss results for L1 and L2 to the output file;
+                tracesout << l1_ret << " " << l2_ret << " " << mem_ret << endl;
             }
-            /*********************************** ↑↑↑ TODO: Implement by you ↑↑↑
-             * ******************************************/
-
-            // Grading: don't change the code below.
-            // We will print your access state of each cycle to see if your
-            // simulator gives the same result as ours.
-            tracesout << L1AcceState << " " << L2AcceState << " "
-                      << MemAcceState << endl;  // Output hit/miss results for
-                                                // L1 and L2 to the output file;
         }
         traces.close();
         tracesout.close();
