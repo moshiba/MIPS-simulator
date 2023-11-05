@@ -144,29 +144,25 @@ struct CacheSet {
      *   - a vector of CacheBlocks
      *   - a counter to keep track of which block to evict next
      */
-    CacheSet(int size_) : size(size_) {
-        this->blocks.resize(size_, CacheBlock());
-    }
+    CacheSet(int size_) : size(size_) { blocks.resize(size, CacheBlock()); }
 
-    CacheBlock& operator[](int index) { return this->blocks[index]; }
+    CacheBlock& operator[](int index) { return blocks[index]; }
 
-    const CacheBlock& operator[](int index) const {
-        return this->blocks[index];
-    }
+    const CacheBlock& operator[](int index) const { return blocks[index]; }
 
     auto search(unsigned tag) {
-        return std::any_of(this->blocks.cbegin(), this->blocks.cend(),
+        return std::any_of(blocks.cbegin(), blocks.cend(),
                            [&tag](CacheBlock block) {
                                return block.valid && block.tag == tag;
                            });
     }
 
     auto evict() {
-        const auto current_ptr = this->eviction_ptr;
-        auto copied_current_block = this->blocks[current_ptr];
+        const auto current_ptr = eviction_ptr;
+        auto copied_current_block = blocks[current_ptr];
 
-        this->blocks[current_ptr].valid = false;
-        this->eviction_ptr = (this->eviction_ptr + 1) % this->size;
+        blocks[current_ptr].valid = false;
+        eviction_ptr = (eviction_ptr + 1) % size;
 
         return copied_current_block;
     }
