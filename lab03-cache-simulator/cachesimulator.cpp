@@ -137,14 +137,30 @@ struct CacheBlock {
     bool dirty;
 };
 
-struct set {
+struct CacheSet {
     /*
      * a cache set:
      *   - a vector of CacheBlocks
      *   - a counter to keep track of which block to evict next
-    */
-    // TODO:
-    // Associativity: eg. resize to 4-ways set associative cache
+     */
+    CacheSet(int size_) : size(size_) {
+        this->blocks.resize(size_, CacheBlock());
+    }
+    auto search() {
+        return std::any_of(this->blocks.cbegin(), this->blocks.cend(),
+                           [](CacheBlock block) { return block.valid; });
+    }
+    auto evict() {
+        const auto current_ptr = this->eviction_ptr;
+        this->eviction_ptr = (this->eviction_ptr + 1) % this->size;
+        return current_ptr;
+    }
+
+    std::vector< CacheBlock > blocks = {CacheBlock()};
+    int eviction_ptr = 0;
+
+   private:
+    int size;
 };
 
 // TODO: another example:
