@@ -3,11 +3,12 @@ Lab 3
 
 Group: (Please put your name and netid here)
 
-Student1 (netid1)
-Student2 (netid2)
+Patryk Markowski (pm3004)
+Tim Lu (hl4851)
 
 Reference: (Include the reference you use)
-
+The only references we used were our class notes and the lecture
+slides.
 
 ***********************************************************
 
