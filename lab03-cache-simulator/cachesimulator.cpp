@@ -146,10 +146,14 @@ struct CacheSet {
     CacheSet(int size_) : size(size_) {
         this->blocks.resize(size_, CacheBlock());
     }
-    auto search() {
+
+    auto search(unsigned tag) {
         return std::any_of(this->blocks.cbegin(), this->blocks.cend(),
-                           [](CacheBlock block) { return block.valid; });
+                           [&tag](CacheBlock block) {
+                               return block.valid && block.tag == tag;
+                           });
     }
+
     auto evict() {
         const auto current_ptr = this->eviction_ptr;
         this->eviction_ptr = (this->eviction_ptr + 1) % this->size;
@@ -160,7 +164,7 @@ struct CacheSet {
     int eviction_ptr = 0;
 
    private:
-    int size;
+    int size;  // number of ways
 };
 
 // TODO: another example:
