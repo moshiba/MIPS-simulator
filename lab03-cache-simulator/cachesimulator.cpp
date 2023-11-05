@@ -155,10 +155,10 @@ struct CacheSet {
     const CacheBlock& operator[](int index) const { return blocks[index]; }
 
     auto search(unsigned tag) {
-        return std::any_of(blocks.cbegin(), blocks.cend(),
-                           [&tag](CacheBlock block) {
-                               return block.valid && block.tag == tag;
-                           });
+        return std::find_if(blocks.begin(), blocks.end(),
+                            [&tag](CacheBlock block) {
+                                return block.valid && block.tag == tag;
+                            });
     }
 
     auto evict() {
@@ -178,34 +178,8 @@ struct CacheSet {
     int size;  // number of ways
 };
 
-class Cache {
-    std::vector< CacheSet > cache_set;
-
-   public:
-    Cache(int num_sets_, int ways_) : sets({CacheSet(ways_)}) {
-        sets.resize(num_sets_, CacheSet(ways_));
-    }
-
-    read_request read(unsigned addr){
-        // TODO
-
-    };
-    write_request write(unsigned addr){
-        // TODO
-    };
-    bool check_exist(unsigned addr){
-        // TODO
-    };
-    auto evict(unsigned addr){
-        // TODO
-    };
-
-    std::vector< CacheSet > sets;
-};
-
 constexpr auto bitmask(unsigned n) { return (1UL << (n + 1)) - 1; }
 
-template < int level_ >
 class CacheAddress {
     /*
      * |------------------------|
@@ -222,15 +196,15 @@ class CacheAddress {
      *      - b = log2(block size in bytes)
      */
    public:
-    CacheAddress(int block_size, int set_size_, int total_size_)
+    CacheAddress(int level_, int block_size, int set_size_, int total_size_)
         : index_size(std::lround(
               std::ceil(std::log2(total_size_ * 1024 / set_size_)))),
           offset_size(std::lround(std::ceil(std::log2(block_size)))),
           tag_size(32 - index_size - offset_size) {
-        dout << "L" << level << " cfg:  <size " << total_size_
+        dout << "L" << level_ << " cfg:  <size " << total_size_
              << " KiB> / <associativity " << set_size_ << "> / <block size "
              << block_size << ">" << endl;
-        dout << "L" << level << " addr: <tag " << tag_size << "> / <index "
+        dout << "L" << level_ << " addr: <tag " << tag_size << "> / <index "
              << index_size << "> / <offset " << offset_size << ">" << endl;
     }
 
@@ -244,22 +218,61 @@ class CacheAddress {
             address & bitmask(offset_size));
     }
 
-    const decltype(level_) level = level_;
-
     int index_size;
     int offset_size;
     int tag_size;
 };
-using L1Address_t = CacheAddress< 1 >;
-using L2Address_t = CacheAddress< 2 >;
+
+class Cache {
+    std::vector< CacheSet > cache_set;
+
+   public:
+    Cache(int block_size_, int num_ways_, int total_size_,
+          CacheAddress addr_sys_)
+        : sets({CacheSet(num_ways_)}), addr_sys(addr_sys_) {
+        const auto num_sets = total_size_ / block_size_ / num_ways_;
+        sets.resize(num_sets, CacheSet(num_ways_));
+    }
+
+    read_request read(unsigned addr) {
+        const auto& [tag, index, offset] = addr_sys.parse(addr);
+        const auto found = sets[index].search(tag);
+
+        if (found != sets[index].blocks.end()) {
+            return read_request::hit;
+        } else {
+            return read_request::miss;
+        }
+    };
+
+    write_request write(unsigned addr) {
+        const auto& [tag, index, offset] = addr_sys.parse(addr);
+        const auto found = sets[index].search(tag);
+
+        if (found != sets[index].blocks.end()) {
+            found->dirty = true;
+            return write_request::hit;
+        } else {
+            return write_request::miss;
+        }
+    };
+
+    CacheBlock evict(unsigned addr){
+        // TODO
+    };
+
+    std::vector< CacheSet > sets;
+    CacheAddress addr_sys;
+};
 
 class CacheSystem {
    public:
     CacheSystem(Config cfg)
-        : l1_cache(cfg.L1size / cfg.L1blocksize / cfg.L1setsize, cfg.L1setsize),
-          l2_cache(cfg.L2size / cfg.L2blocksize / cfg.L2setsize, cfg.L2setsize),
-          l1_address(cfg.L1blocksize, cfg.L1setsize, cfg.L1size),
-          l2_address(cfg.L2blocksize, cfg.L2setsize, cfg.L2size) {}
+        : l1_cache(cfg.L1blocksize, cfg.L1setsize, cfg.L1size,
+                   CacheAddress(1, cfg.L1blocksize, cfg.L1setsize, cfg.L1size)),
+          l2_cache(
+              cfg.L2blocksize, cfg.L2setsize, cfg.L2size,
+              CacheAddress(2, cfg.L2blocksize, cfg.L2setsize, cfg.L2size)) {}
 
     auto read(unsigned addr) {
         if (l1_cache.read(addr) == read_request::hit) {
@@ -291,8 +304,6 @@ class CacheSystem {
 
     Cache l1_cache;
     Cache l2_cache;
-    L1Address_t l1_address;
-    L2Address_t l2_address;
 };
 
 int main(int argc, char* argv[]) {
