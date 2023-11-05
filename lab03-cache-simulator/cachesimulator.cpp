@@ -130,6 +130,7 @@ struct CacheBlock {
      */
     CacheBlock(unsigned tag_, bool valid_, bool dirty_)
         : tag(tag_), valid(valid_), dirty(dirty_) {}
+
     CacheBlock() : CacheBlock(0, 0, 0) {}
 
     unsigned tag;
@@ -147,6 +148,12 @@ struct CacheSet {
         this->blocks.resize(size_, CacheBlock());
     }
 
+    CacheBlock& operator[](int index) { return this->blocks[index]; }
+
+    const CacheBlock& operator[](int index) const {
+        return this->blocks[index];
+    }
+
     auto search(unsigned tag) {
         return std::any_of(this->blocks.cbegin(), this->blocks.cend(),
                            [&tag](CacheBlock block) {
@@ -156,8 +163,12 @@ struct CacheSet {
 
     auto evict() {
         const auto current_ptr = this->eviction_ptr;
+        auto copied_current_block = this->blocks[current_ptr];
+
+        this->blocks[current_ptr].valid = false;
         this->eviction_ptr = (this->eviction_ptr + 1) % this->size;
-        return current_ptr;
+
+        return copied_current_block;
     }
 
     std::vector< CacheBlock > blocks = {CacheBlock()};
@@ -167,9 +178,8 @@ struct CacheSet {
     int size;  // number of ways
 };
 
-// TODO: another example:
 class Cache {
-    set* CacheSet;
+    CacheSet* cache_set;
 
    public:
     auto read_access(unsigned addr){};
