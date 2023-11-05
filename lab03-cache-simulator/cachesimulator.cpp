@@ -192,11 +192,13 @@ public:
         uint32_t L1_row = (addr >> L1_block_size_bits)%(L1_num_sets);
 
         //Debugging only
-        cout << "L1 currently has tag: " << L1_cache[0]->set_blocks[0].tag << " at row 0" << endl;
+        //cout << "L1 currently has tag: " << L1_cache[0]->set_blocks[0].tag << " at row 0" << endl;
 
         for(int i=0; i<L1_associativity; ++i){
             if((L1_tag == L1_cache[L1_row]->set_blocks[i].tag) && (L1_cache[L1_row]->set_blocks[i].valid == 1)){
                 //We have a cache hit; do nothing
+                //cout << "L2 currently has tag: " << L2_cache[0]->set_blocks[0].tag << " at row 0" << endl;
+                //cout << "L2 also .... has tag: " << L2_cache[0]->set_blocks[1].tag << " at row 0" << endl;
                 return RH;
             }
         }
@@ -226,7 +228,8 @@ public:
 
 
         //Debugging only
-        cout << "L2 currently has tag: " << L2_cache[0]->set_blocks[0].tag << " at row 0" << endl;
+        //cout << "L2 currently has tag: " << L2_cache[0]->set_blocks[0].tag << " at row 0" << endl;
+        //cout << "L2 also .... has tag: " << L2_cache[0]->set_blocks[1].tag << " at row 0" << endl;
 
         for(int i=0; i<L2_associativity; ++i){
             if((L2_tag == L2_cache[L2_row]->set_blocks[i].tag) && (L2_cache[L2_row]->set_blocks[i].valid == 1)){
@@ -262,19 +265,21 @@ public:
         int counter = L1_cache[L1_row]->counter;
         //if full, evict to L2 first then move new block
         if(is_L1_row_full(L1_row)){
+            L1_cache[L1_row]->set_blocks[counter].valid = 0;
             //We need to calculate the address of the current L1 tag at the specified row
             //in order to evict it
             //uint32_t L1_tag_bits = 32 - (L1_block_size_bits + L1_row_bits);
             uint32_t L1_old_tag = L1_cache[L1_row]->set_blocks[counter].tag;
             uint32_t L1_old_addr = (L1_old_tag << (L1_row_bits + L1_block_size_bits)) | 
             (L1_row << L1_block_size_bits) | (power(2, L1_block_size_bits)-1);
-            cout << "The address to be passed to L2 is: " << L1_old_addr << endl;
+            //cout << "The address to be passed to L2 is: " << L1_old_addr << endl;
             write_to_mem = move_to_L2(L1_cache[L1_row]->set_blocks[counter], L1_old_addr);
+            L1_cache[L1_row]->counter = (counter + 1) % L1_associativity;
         }
-        L1_cache[L1_row]->set_blocks[counter] = cache_block;
-        L1_cache[L1_row]->set_blocks[counter].valid = 1;
-        L1_cache[L1_row]->set_blocks[counter].tag = L1_new_tag;
-        L1_cache[L1_row]->counter = (counter + 1) % L1_associativity;
+        int new_data_index = find_invalid_L1(L1_row);
+        L1_cache[L1_row]->set_blocks[new_data_index] = cache_block;
+        L1_cache[L1_row]->set_blocks[new_data_index].valid = 1;
+        L1_cache[L1_row]->set_blocks[new_data_index].tag = L1_new_tag;
         return write_to_mem;
     }
 
@@ -285,7 +290,7 @@ public:
         uint32_t L2_tag = addr >> (L2_block_size_bits + L2_row_bits);
         uint32_t L2_row = (addr >> L2_block_size_bits)%(L2_num_sets);
         int counter = L2_cache[L2_row]->counter;
-        //if full, evict to memory first then move new block
+        //if full, evict first then move new block
         if(is_L2_row_full(L2_row)){
             //eviction is just changing the valid bit
             L2_cache[L2_row]->set_blocks[counter].valid = 0;
@@ -295,9 +300,10 @@ public:
             }
             L2_cache[L2_row]->counter = (counter + 1) % L2_associativity;
         }
-        L2_cache[L2_row]->set_blocks[counter] = cache_block;
-        L2_cache[L2_row]->set_blocks[counter].valid = 1;
-        L2_cache[L2_row]->set_blocks[counter].tag = L2_tag;
+        int new_data_index = find_invalid_L2(L2_row);
+        L2_cache[L2_row]->set_blocks[new_data_index] = cache_block;
+        L2_cache[L2_row]->set_blocks[new_data_index].valid = 1;
+        L2_cache[L2_row]->set_blocks[new_data_index].tag = L2_tag;
         return write_to_mem;
     }
 
@@ -324,6 +330,7 @@ private:
         return 1;
     }
 
+    //Function for determining whether a cache row is full or not, used for eviction
     bool is_L2_row_full(int row){
         for(int i=0; i<L2_associativity; ++i){
             if(L2_cache[row]->set_blocks[i].valid == 0){
@@ -331,6 +338,28 @@ private:
             }
         }
         return 1;
+    }
+
+    //Function for finding invalid cache block index, used for determining 
+    //which way to write new data
+    int find_invalid_L1(int row){
+        for(int i=0; i<L1_associativity; ++i){
+            if(L1_cache[row]->set_blocks[i].valid == 0){
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    //Function for finding invalid cache block index, used for determining 
+    //which way to write new data
+    int find_invalid_L2(int row){
+        for(int i=0; i<L2_associativity; ++i){
+            if(L2_cache[row]->set_blocks[i].valid == 0){
+                return i;
+            }
+        }
+        return 0;
     }
 
     //Function for do exponent operator; used for calculating number of sets
@@ -439,7 +468,7 @@ int main(int argc, char *argv[])
                 //     L2AcceState, MemAcceState = cache.readL2(addr); // if L1 read miss, read L2
                 // }
                 // else{ ... }
-                cout << xaddr << ": " << endl;
+                //cout << xaddr << ": " << endl;
                 L1AcceState = cache.readL1(addr);
                 if(L1AcceState == RH){
                     L2AcceState = NA;
@@ -465,6 +494,7 @@ int main(int argc, char *argv[])
                         MemAcceState = WRITEMEM;
                     }
                 }
+                //cout << xaddr << ": " << endl;
             }
             else{ // a Write request
                 // Implement by you:
