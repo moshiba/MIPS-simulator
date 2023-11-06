@@ -257,10 +257,6 @@ class Cache {
         }
     };
 
-    CacheBlock evict(unsigned addr){
-        // TODO
-    };
-
     std::vector< CacheSet > sets;
     CacheAddress addr_sys;
 };
@@ -293,14 +289,101 @@ class CacheSystem {
             return make_tuple(WH, NA, NOWRITEMEM);
         } else {
             if (l2_cache.write(addr) == write_request::hit) {
-                // TODO: evict ?
                 return make_tuple(WM, WH, NOWRITEMEM);
             } else {
-                // TODO: evict ?
                 return make_tuple(WM, WM, WRITEMEM);
             }
         }
     };
+
+    auto l2_evict(unsigned addr) {
+        // return value: <bool> did_write_to_mem ?
+
+        const auto& [tag, index, offset] = l2_cache.addr_sys.parse(addr);
+        auto& set = l2_cache.sets[index];
+
+        {
+            // assert addr is cached in L2
+            const auto found = set.search(tag);
+            if (found == set.cend()) {
+                dout << debug::bg::red << "evicting L2 addr(" << addr
+                     << ") when there's space" << debug::reset << endl;
+                exit(3);
+            }
+        }
+
+        auto evict_idx = set.evict_who();
+        set[evict_idx].valid = false;
+
+        // pseudo-op: write to mem
+        const bool did_write_to_mem = set[evict_idx].dirty;
+        return did_write_to_mem;
+    }
+
+    auto l1_evict(unsigned addr) {
+        // return value: <bool> did_write_to_mem ?
+
+        const auto& [l1_tag, l1_index, l1_offset] =
+            l1_cache.addr_sys.parse(addr);
+        auto& l1_set = l1_cache.sets[l1_index];
+
+        {
+            // assert addr is cached in L1
+            const auto found = l1_set.search(l1_tag);
+            if (found == l1_set.cend()) {
+                dout << debug::bg::red << "evicting L1 addr(" << addr
+                     << ") when there's space" << debug::reset << endl;
+                exit(2);
+            }
+        }
+
+        auto evict_idx = l1_set.evict_who();
+        auto& evicted_block = l1_set[evict_idx];
+
+        // reconstruct addr of the evicted L1 block
+        unsigned evicted_l1_block_addr =
+            // tag
+            ((evicted_block.tag & bitmask(l1_cache.addr_sys.tag_size))
+             << (l1_cache.addr_sys.offset_size +
+                 l1_cache.addr_sys.index_size)) |
+            // index
+            ((l1_index & bitmask(l1_cache.addr_sys.index_size))
+             << l1_cache.addr_sys.offset_size) |
+            // offset
+            (0 & bitmask(l1_cache.addr_sys.offset_size));
+
+        bool did_write_to_mem = false;
+
+        // move L1_evicted to L2
+        // search empty spot in L2 with evicted_L1_block_addr
+        const auto& [l2_tag, l2_index, l2_offset] =
+            l2_cache.addr_sys.parse(evicted_l1_block_addr);
+        auto& l2_set = l2_cache.sets[l2_index];
+        const auto l2_full_or_not =
+            std::find_if(l2_set.blocks.begin(), l2_set.blocks.end(),
+                         [](CacheBlock b) { return !(b.valid); });
+        if (l2_full_or_not == l2_set.cend()) {  // L2 is full
+            // evict L2
+            auto did_write_mem = this->l2_evict(evicted_l1_block_addr);
+            did_write_to_mem = did_write_mem;
+        }
+
+        // insert L1_evicted to L2
+        const auto l2_empty_spot =
+            std::find_if(l2_set.blocks.begin(), l2_set.blocks.end(),
+                         [](CacheBlock b) { return !(b.valid); });
+        if (l2_empty_spot == l2_set.cend()) {
+            dout << debug::bg::red
+                 << "cannot find empty spot right after eviction"
+                 << debug::reset << endl;
+            exit(4);
+        }
+        *l2_empty_spot = evicted_block;
+
+        evicted_block.valid = false;
+
+        return did_write_to_mem;
+    }
 
     Cache l1_cache;
     Cache l2_cache;
