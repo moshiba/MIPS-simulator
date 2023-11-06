@@ -150,8 +150,18 @@ struct CacheSet {
      *   - a counter to keep track of which block to evict next
      */
     CacheSet(int size_) : size(size_) { blocks.resize(size, CacheBlock()); }
-    CacheBlock& operator[](int index) { return blocks[index]; }
-    const CacheBlock& operator[](int index) const { return blocks[index]; }
+    CacheBlock& operator[](int index) {
+        if (index > size) {
+            throw std::out_of_range("index out of bound");
+        }
+        return blocks[index];
+    }
+    const CacheBlock& operator[](int index) const {
+        if (index > size) {
+            throw std::out_of_range("index out of bound");
+        }
+        return blocks[index];
+    }
     auto cbegin() { return blocks.cbegin(); }
     auto cend() { return blocks.cend(); }
 
