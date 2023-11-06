@@ -163,14 +163,10 @@ struct CacheSet {
                             });
     }
 
-    auto evict() {
-        const auto current_ptr = eviction_ptr;
-        auto copied_current_block = blocks[current_ptr];
-
-        blocks[current_ptr].valid = false;
+    auto evict_who() {
+        const auto copied_eviction_ptr = eviction_ptr;
         eviction_ptr = (eviction_ptr + 1) % size;
-
-        return copied_current_block;
+        return copied_eviction_ptr;
     }
 
     std::vector< CacheBlock > blocks = {CacheBlock()};
