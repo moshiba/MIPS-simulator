@@ -212,8 +212,8 @@ class CacheAddress {
      */
    public:
     CacheAddress(int level_, int block_size, int set_size_, int total_size_)
-        : index_size(std::lround(
-              std::ceil(std::log2(total_size_ * 1024 / set_size_)))),
+        : index_size(std::lround(std::ceil(
+              std::log2(total_size_ * 1024 / block_size / set_size_)))),
           offset_size(std::lround(std::ceil(std::log2(block_size)))),
           tag_size(32 - index_size - offset_size) {
         dout << "L" << level_ << " cfg:  <size " << total_size_
@@ -226,11 +226,11 @@ class CacheAddress {
     auto parse(unsigned address) {
         return std::make_tuple(
             // tag bits
-            (address >> (offset_size + index_size)) & bitmask(tag_size),
+            ((address >> (offset_size + index_size)) & bitmask(tag_size)),
             // index bits
-            (address >> offset_size) & bitmask(index_size),
+            ((address >> offset_size) & bitmask(index_size)),
             // offset bits
-            address & bitmask(offset_size));
+            (address & bitmask(offset_size)));
     }
 
     int index_size;
@@ -239,13 +239,11 @@ class CacheAddress {
 };
 
 class Cache {
-    std::vector< CacheSet > cache_set;
-
    public:
     Cache(int block_size_, int num_ways_, int total_size_,
           CacheAddress addr_sys_)
         : sets({CacheSet(num_ways_)}), addr_sys(addr_sys_) {
-        const auto num_sets = total_size_ / block_size_ / num_ways_;
+        const auto num_sets = total_size_ * 1024 / block_size_ / num_ways_;
         sets.resize(num_sets, CacheSet(num_ways_));
     }
 
@@ -287,7 +285,7 @@ class CacheSystem {
               cfg.L2blocksize, cfg.L2setsize, cfg.L2size,
               CacheAddress(2, cfg.L2blocksize, cfg.L2setsize, cfg.L2size)) {}
 
-    auto l2_evict(unsigned addr) {
+    bool l2_evict(unsigned addr) {
         // return value: <bool> did_write_to_mem ?
 
         const auto& [tag, index, offset] = l2_cache.addr_sys.parse(addr);
@@ -311,7 +309,7 @@ class CacheSystem {
         return did_write_to_mem;
     }
 
-    auto l1_evict(unsigned addr) {
+    bool l1_evict(unsigned addr) {
         // return value: <bool> did_write_to_mem ?
 
         const auto& [l1_tag, l1_index, l1_offset] =
@@ -378,9 +376,12 @@ class CacheSystem {
 
     auto read(unsigned addr) {
         if (l1_cache.read(addr) == read_request::hit) {
+            dout << debug::green << "L1 hit" << debug::reset << endl;
             return make_tuple(RH, NA, NOWRITEMEM);
         } else {
+            dout << debug::red << "L1 miss" << debug::reset << endl;
             if (l2_cache.read(addr) == read_request::hit) {
+                dout << debug::green << "L2 hit" << debug::reset << endl;
                 /*
                  * 1. move "block" to L1
                  * 2. evict something from L1 to L2 if L1 is full
@@ -425,7 +426,8 @@ class CacheSystem {
                 return make_tuple(RM, RM,
                                   did_write_to_mem ? WRITEMEM : NOWRITEMEM);
             } else {  // L2 miss
-                bool did_write_to_mem;
+                dout << debug::red << "L2 miss" << debug::reset << endl;
+                bool did_write_to_mem = false;
 
                 // search for empty spot in L1
                 const auto& [tag, index, offset] =
@@ -457,11 +459,15 @@ class CacheSystem {
 
     auto write(unsigned addr) {
         if (l1_cache.write(addr) == write_request::hit) {
+            dout << debug::green << "L1 hit" << debug::reset << endl;
             return make_tuple(WH, NA, NOWRITEMEM);
         } else {
+            dout << debug::red << "L1 miss" << debug::reset << endl;
             if (l2_cache.write(addr) == write_request::hit) {
+                dout << debug::green << "L2 hit" << debug::reset << endl;
                 return make_tuple(WM, WH, NOWRITEMEM);
             } else {
+                dout << debug::red << "L2 miss" << debug::reset << endl;
                 return make_tuple(WM, WM, WRITEMEM);
             }
         }
@@ -523,10 +529,16 @@ int main(int argc, char* argv[]) {
 
             // access the L1 and L2 Cache according to the trace;
             if (accesstype.compare("R") == 0) {
+                dout << debug::bg::blue << "R" << debug::reset << " "
+                     << hex_addr << " " << access_addr << endl;
+
                 const auto& [l1_ret, l2_ret, mem_ret] = cache_sys.read(addr);
                 // Output hit/miss results for L1 and L2 to the output file;
                 tracesout << l1_ret << " " << l2_ret << " " << mem_ret << endl;
             } else {
+                dout << debug::bg::red << "W" << debug::reset << " " << hex_addr
+                     << " " << access_addr << endl;
+
                 const auto& [l1_ret, l2_ret, mem_ret] = cache_sys.write(addr);
                 // Output hit/miss results for L1 and L2 to the output file;
                 tracesout << l1_ret << " " << l2_ret << " " << mem_ret << endl;
