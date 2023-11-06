@@ -270,32 +270,6 @@ class CacheSystem {
               cfg.L2blocksize, cfg.L2setsize, cfg.L2size,
               CacheAddress(2, cfg.L2blocksize, cfg.L2setsize, cfg.L2size)) {}
 
-    auto read(unsigned addr) {
-        if (l1_cache.read(addr) == read_request::hit) {
-            return make_tuple(RH, NA, NOWRITEMEM);
-        } else {
-            if (l2_cache.read(addr) == read_request::hit) {
-                bool evict_to_mem;  // TODO: evict L2 to memory
-                return make_tuple(RM, RH, evict_to_mem ? WRITEMEM : NOWRITEMEM);
-            } else {
-                bool evict_to_mem;  // TODO: evict L2 to memory
-                return make_tuple(RM, RM, evict_to_mem ? WRITEMEM : NOWRITEMEM);
-            }
-        }
-    };
-
-    auto write(unsigned addr) {
-        if (l1_cache.write(addr) == write_request::hit) {
-            return make_tuple(WH, NA, NOWRITEMEM);
-        } else {
-            if (l2_cache.write(addr) == write_request::hit) {
-                return make_tuple(WM, WH, NOWRITEMEM);
-            } else {
-                return make_tuple(WM, WM, WRITEMEM);
-            }
-        }
-    };
-
     auto l2_evict(unsigned addr) {
         // return value: <bool> did_write_to_mem ?
 
@@ -384,6 +358,97 @@ class CacheSystem {
 
         return did_write_to_mem;
     }
+
+    auto read(unsigned addr) {
+        if (l1_cache.read(addr) == read_request::hit) {
+            return make_tuple(RH, NA, NOWRITEMEM);
+        } else {
+            if (l2_cache.read(addr) == read_request::hit) {
+                /*
+                 * 1. move "block" to L1
+                 * 2. evict something from L1 to L2 if L1 is full
+                 * 3. evict something from L2 to mem if L2 is full
+                 */
+                bool did_write_to_mem = false;
+
+                // Move from L2 to L1
+                // - copy then mark the L2 block as invalid
+                const auto& [l2_tag, l2_index, l2_offset] =
+                    l2_cache.addr_sys.parse(addr);
+                const auto l2_found = l2_cache.sets[l2_index].search(l2_tag);
+                CacheBlock copied_block = *l2_found;
+                l2_found->valid = false;
+
+                // - find empty spot in L1
+                const auto& [l1_tag, l1_index, l1_offset] =
+                    l1_cache.addr_sys.parse(addr);
+                auto& l1_set = l1_cache.sets[l1_index];
+                const auto empty_spot_in_l1 =
+                    std::find_if(l1_set.blocks.begin(), l1_set.blocks.end(),
+                                 [](CacheBlock b) { return !(b.valid); });
+                if (empty_spot_in_l1 != l1_set.cend()) {
+                    // found empty spot
+                    *empty_spot_in_l1 = copied_block;
+                } else {
+                    // did not find empty spot, need to evict someone from L1
+                    did_write_to_mem = this->l1_evict(addr) || did_write_to_mem;
+                    // place "evicted L1 block" into L2
+                    // search empty spot in L1 again
+                    const auto l1_empty_spot_after_eviction =
+                        std::find_if(l1_set.blocks.begin(), l1_set.blocks.end(),
+                                     [](CacheBlock b) { return !(b.valid); });
+                    if (l1_empty_spot_after_eviction == l1_set.cend()) {
+                        dout << debug::bg::red
+                             << "cannot find empty spot right after eviction"
+                             << debug::reset << endl;
+                        exit(5);
+                    }
+                    *l1_empty_spot_after_eviction = copied_block;
+                }
+                return make_tuple(RM, RM,
+                                  did_write_to_mem ? WRITEMEM : NOWRITEMEM);
+            } else {  // L2 miss
+                bool did_write_to_mem;
+
+                // search for empty spot in L1
+                const auto& [tag, index, offset] =
+                    l1_cache.addr_sys.parse(addr);
+                auto& set = l1_cache.sets[index];
+                const auto l1_is_full =
+                    std::find_if(set.blocks.begin(), set.blocks.end(),
+                                 [](CacheBlock b) { return !(b.valid); });
+                // TODO: check all "find_if" and try to replace with "any_of"
+                // if L1 full, evict
+                // TODO:
+                if (l1_is_full == set.cend()) {
+                    did_write_to_mem = this->l1_evict(addr) || did_write_to_mem;
+                    // try inserting to L1 again
+                    const auto l1_empty_spot =
+                        std::find_if(set.blocks.begin(), set.blocks.end(),
+                                     [](CacheBlock b) { return !(b.valid); });
+                    // TODO: assert can find not-end element
+                    l1_empty_spot->tag = tag;
+                    l1_empty_spot->dirty = false;
+                    l1_empty_spot->valid = true;
+                }
+
+                return make_tuple(RM, RM,
+                                  did_write_to_mem ? WRITEMEM : NOWRITEMEM);
+            }
+        }
+    };
+
+    auto write(unsigned addr) {
+        if (l1_cache.write(addr) == write_request::hit) {
+            return make_tuple(WH, NA, NOWRITEMEM);
+        } else {
+            if (l2_cache.write(addr) == write_request::hit) {
+                return make_tuple(WM, WH, NOWRITEMEM);
+            } else {
+                return make_tuple(WM, WM, WRITEMEM);
+            }
+        }
+    };
 
     Cache l1_cache;
     Cache l2_cache;
