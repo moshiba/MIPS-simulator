@@ -33,6 +33,7 @@ The 32 bit address is divided into
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -169,8 +170,14 @@ struct CacheSet {
     bool is_full() { return !(this->has_space()); }
 
     auto find_space() {
-        return std::find_if(blocks.cbegin(), blocks.cend(),
-                            [](CacheBlock b) { return b.valid; });
+        auto ptr = std::find_if(blocks.begin(), blocks.end(),
+                                [](CacheBlock b) { return b.valid; });
+        if (ptr == blocks.end()) {
+            // didn't find empty spot
+            throw std::runtime_error("no space left");
+        } else {
+            return ptr;
+        }
     }
 
     auto evict_who() {
