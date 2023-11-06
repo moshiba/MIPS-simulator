@@ -152,6 +152,8 @@ struct CacheSet {
 
     CacheBlock& operator[](int index) { return blocks[index]; }
 
+    auto cend() { return blocks.cend(); }
+
     const CacheBlock& operator[](int index) const { return blocks[index]; }
 
     auto search(unsigned tag) {
@@ -236,9 +238,10 @@ class Cache {
 
     read_request read(unsigned addr) {
         const auto& [tag, index, offset] = addr_sys.parse(addr);
-        const auto found = sets[index].search(tag);
+        auto& set = sets[index];
+        const auto found = set.search(tag);
 
-        if (found != sets[index].blocks.end()) {
+        if (found != set.cend()) {
             return read_request::hit;
         } else {
             return read_request::miss;
@@ -247,9 +250,10 @@ class Cache {
 
     write_request write(unsigned addr) {
         const auto& [tag, index, offset] = addr_sys.parse(addr);
-        const auto found = sets[index].search(tag);
+        auto& set = sets[index];
+        const auto found = set.search(tag);
 
-        if (found != sets[index].blocks.end()) {
+        if (found != set.cend()) {
             found->dirty = true;
             return write_request::hit;
         } else {
