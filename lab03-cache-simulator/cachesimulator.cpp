@@ -193,7 +193,7 @@ struct CacheSet {
     int size;  // number of ways
 };
 
-constexpr auto bitmask(unsigned n) { return (1UL << (n + 1)) - 1; }
+constexpr long bitmask(unsigned n) { return (1UL << n) - 1; }
 
 class CacheAddress {
     /*
