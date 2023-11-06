@@ -149,18 +149,28 @@ struct CacheSet {
      *   - a counter to keep track of which block to evict next
      */
     CacheSet(int size_) : size(size_) { blocks.resize(size, CacheBlock()); }
-
     CacheBlock& operator[](int index) { return blocks[index]; }
-
-    auto cend() { return blocks.cend(); }
-
     const CacheBlock& operator[](int index) const { return blocks[index]; }
+    auto cbegin() { return blocks.cbegin(); }
+    auto cend() { return blocks.cend(); }
 
     auto search(unsigned tag) {
         return std::find_if(blocks.begin(), blocks.end(),
                             [&tag](CacheBlock block) {
                                 return block.valid && block.tag == tag;
                             });
+    }
+
+    bool has_space() {
+        return std::any_of(blocks.cbegin(), blocks.cend(),
+                           [](CacheBlock b) { return b.valid; });
+    }
+
+    bool is_full() { return !(this->has_space()); }
+
+    auto find_space() {
+        return std::find_if(blocks.cbegin(), blocks.cend(),
+                            [](CacheBlock b) { return b.valid; });
     }
 
     auto evict_who() {
