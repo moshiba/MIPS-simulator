@@ -164,15 +164,15 @@ struct CacheSet {
 
     bool has_space() {
         return std::any_of(blocks.cbegin(), blocks.cend(),
-                           [](CacheBlock b) { return b.valid; });
+                           [](CacheBlock b) { return !(b.valid); });
     }
 
     bool is_full() { return !(this->has_space()); }
 
     auto find_space() {
         auto ptr = std::find_if(blocks.begin(), blocks.end(),
-                                [](CacheBlock b) { return b.valid; });
-        if (ptr == blocks.end()) {
+                                [](CacheBlock b) { return !(b.valid); });
+        if (ptr == blocks.cend()) {
             // didn't find empty spot
             throw std::runtime_error("no space left");
         } else {
