@@ -307,7 +307,7 @@ class CacheSystem {
             if (found == set.cend()) {
                 dout << debug::bg::red << "evicting L2 addr(" << addr
                      << ") when there's space" << debug::reset << endl;
-                exit(3);
+                throw std::runtime_error("evicting L2 addr when there's space");
             }
         }
 
@@ -332,7 +332,7 @@ class CacheSystem {
             if (found == l1_set.cend()) {
                 dout << debug::bg::red << "evicting L1 addr(" << addr
                      << ") when there's space" << debug::reset << endl;
-                exit(2);
+                throw std::runtime_error("evicting L1 addr when there's space");
             }
         }
 
@@ -375,7 +375,8 @@ class CacheSystem {
             dout << debug::bg::red
                  << "cannot find empty spot right after eviction"
                  << debug::reset << endl;
-            exit(4);
+            throw std::runtime_error(
+                "cannot find empty spot right after eviction");
         }
         *l2_empty_spot = evicted_block;
 
@@ -429,7 +430,8 @@ class CacheSystem {
                         dout << debug::bg::red
                              << "cannot find empty spot right after eviction"
                              << debug::reset << endl;
-                        exit(5);
+                        throw std::runtime_error(
+                            "cannot find empty spot right after eviction");
                     }
                     *l1_empty_spot_after_eviction = copied_block;
                 }
