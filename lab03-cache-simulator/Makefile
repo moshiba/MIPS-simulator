@@ -5,6 +5,10 @@ cachesimulator: cachesimulator.cpp
 debug: cachesimulator.cpp
 	g++ -DDEBUG ${CXXFLAGS} cachesimulator.cpp -o cachesimulator.out
 verify:
-	diff trace.txt.out expected_results/trace.txt.out.ans.txt
+	vimdiff trace.txt.out expected_results/trace.txt.out.ans.txt
+verify2:
+	vimdiff trace.txt.out expected_results/trace_set_associative.txt.out.ans.txt
 run:
 	./cachesimulator.out cacheconfig.txt trace.txt
+run2:
+	./cachesimulator.out cacheconfig_set_associative.txt trace_set_associative.txt
