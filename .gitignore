@@ -47,6 +47,9 @@ compile_commands.json
 *.out
 *.app
 
+# Debug symbols
+*.dSYM/
+
 
 ##########################
 # Python
