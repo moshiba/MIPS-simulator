@@ -71,7 +71,6 @@ using namespace std;
 
 class PhyMem {
    public:
-    bitset< 32 > readdata;
     PhyMem() {
         DMem.resize(MemSize);
         ifstream dmem;
@@ -87,12 +86,13 @@ class PhyMem {
             cout << "Unable to open page table init file";
         dmem.close();
     }
-    bitset< 32 > outputMemValue(bitset< 12 > Address) {
-        bitset< 32 > readdata;
-        /**TODO: implement!
-         * Returns the value stored in the physical address
-         */
 
+    bitset< 32 > outputMemValue(bitset< 12 > address_bits) {
+        unsigned address = address_bits.to_ulong();
+        bitset< 32 > readdata = DMem[address + 0].to_ulong() << 24 |
+                                DMem[address + 1].to_ulong() << 16 |
+                                DMem[address + 2].to_ulong() << 8 |
+                                DMem[address + 3].to_ulong() << 0;
         return readdata;
     }
 
