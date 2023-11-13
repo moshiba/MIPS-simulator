@@ -34,28 +34,31 @@ debug_cout dout;
 bool is_debug() { return nullptr != std::getenv("DEBUG"); }
 
 template < typename T >
-debug_cout& operator<<(debug_cout& s, const T& x) {
+debug_cout& operator<<(debug_cout& s, [[maybe_unused]] const T& x) {
 #ifdef DEBUG
     std::cout << x;
 #endif
     return s;
 }
 
-debug_cout& operator<<(debug_cout& s, std::ostream& (*f)(std::ostream&)) {
+debug_cout& operator<<(debug_cout& s,
+                       [[maybe_unused]] std::ostream& (*f)(std::ostream&)) {
 #ifdef DEBUG
     f(std::cout);
 #endif
     return s;
 }
 
-debug_cout& operator<<(debug_cout& s, std::ostream& (*f)(std::ios&)) {
+debug_cout& operator<<(debug_cout& s,
+                       [[maybe_unused]] std::ostream& (*f)(std::ios&)) {
 #ifdef DEBUG
     f(std::cout);
 #endif
     return s;
 }
 
-debug_cout& operator<<(debug_cout& s, std::ostream& (*f)(std::ios_base&)) {
+debug_cout& operator<<(debug_cout& s,
+                       [[maybe_unused]] std::ostream& (*f)(std::ios_base&)) {
 #ifdef DEBUG
     f(std::cout);
 #endif
