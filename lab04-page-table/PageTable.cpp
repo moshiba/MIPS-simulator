@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -107,6 +108,118 @@ class PhysicalMemory {
     vector< bitset< 8 > > DMem;
 };
 
+class VirtualAddress {
+   public:
+    static constexpr int n_bits_outer = 4;
+    static constexpr int n_bits_inner = 4;
+    static constexpr int n_bits_offset = 6;
+    static_assert(n_bits_outer + n_bits_inner + n_bits_offset == 14);
+
+    VirtualAddress(unsigned address)
+        : value(address),
+          outer_page_number((address >> (n_bits_inner + n_bits_offset)) &
+                            bitmask(n_bits_outer)),
+          inner_page_number((address >> n_bits_offset) & bitmask(n_bits_inner)),
+          offset(address & bitmask(n_bits_offset)) {}
+
+    unsigned value;
+    unsigned outer_page_number;
+    unsigned inner_page_number;
+    unsigned offset;
+};
+
+constexpr const int page_size = 1 << VirtualAddress::n_bits_offset;
+
+class OuterPageTableEntry {
+   public:
+    static constexpr int n_bits_pa = 12;
+    static constexpr int n_bits_unused = 19;
+    static constexpr int n_bits_valid = 1;
+    static_assert(n_bits_pa + n_bits_unused + n_bits_valid == 32);
+
+    OuterPageTableEntry(unsigned address)
+        : value(address),
+          inner_table_addr((address >> (n_bits_unused + n_bits_valid)) &
+                           bitmask(n_bits_pa)),
+          unused((address >> n_bits_valid) & bitmask(n_bits_unused)),
+          valid(address & bitmask(n_bits_valid)) {}
+
+    unsigned value;
+    unsigned inner_table_addr;
+    unsigned unused;
+    unsigned valid;
+};
+
+class InnerPageTableEntry {
+   public:
+    static constexpr int n_bits_frame = 6;
+    static constexpr int n_bits_unused = 25;
+    static constexpr int n_bits_valid = 1;
+    static_assert(n_bits_frame + n_bits_unused + n_bits_valid == 32);
+
+    InnerPageTableEntry(unsigned address)
+        : value(address),
+          frame_num((address >> (n_bits_unused + n_bits_valid)) &
+                    bitmask(n_bits_frame)),
+          unused((address >> n_bits_valid) & bitmask(n_bits_unused)),
+          valid(address & bitmask(n_bits_valid)) {}
+
+    unsigned value;
+    unsigned frame_num;
+    unsigned unused;
+    unsigned valid;
+};
+
+class PhysicalAddress {
+   public:
+    PhysicalAddress(unsigned frame_number_, unsigned frame_offset_)
+        : frame_number(frame_number_), frame_offset(frame_offset_) {}
+    operator unsigned() { return frame_number << 6 | frame_offset; }
+
+    unsigned frame_number;
+    unsigned frame_offset;
+};
+
+class OuterPageTable {
+   public:
+    OuterPageTable(PhysicalMemory& memory_, unsigned pt_addr_)
+        : memory(memory_), pt_addr(pt_addr_) {}
+
+    OuterPageTableEntry operator[](int index) {
+        const unsigned addr_offset = index << 2;
+        if (addr_offset >= page_size) {
+            throw std::out_of_range("Outer-PT access out of range");
+        }
+        if (addr_offset % 4 != 0) {
+            throw std::invalid_argument("Unaligned outer-PT memory access");
+        }
+        return memory[pt_addr + addr_offset];
+    }
+
+    PhysicalMemory& memory;
+    unsigned pt_addr;
+};
+
+class InnerPageTable {
+   public:
+    InnerPageTable(PhysicalMemory& memory_, unsigned pt_addr_)
+        : memory(memory_), pt_addr(pt_addr_) {}
+
+    InnerPageTableEntry operator[](int index) {
+        const unsigned addr_offset = index << 2;
+        if (addr_offset >= page_size) {
+            throw std::out_of_range("Inner-PT access out of range");
+        }
+        if (addr_offset % 4 != 0) {
+            throw std::invalid_argument("Unaligned inner-PT memory access");
+        }
+        return memory[pt_addr + addr_offset];
+    }
+
+    PhysicalMemory& memory;
+    unsigned pt_addr;
+};
+
 int main(int argc, char* argv[]) {
     PhysicalMemory myPhyMem;
 
@@ -125,26 +238,38 @@ int main(int argc, char* argv[]) {
     bitset< 12 > PTBR;
     PTB_file >> PTBR;
 
-    string line;
+    auto outer_page_table = OuterPageTable(myPhyMem, PTBR.to_ulong());
 
     // Read a virtual address form the PageTable and convert it to the
     // physical address
     if (traces.is_open() && tracesout.is_open()) {
+        string line;
         while (getline(traces, line)) {
             const auto virtual_addr_bits = bitset< 14 >(line);
             const auto virtual_addr =
                 VirtualAddress(virtual_addr_bits.to_ulong());
 
-            // TODO: Implement!
-            //  Access the outer page table
+            auto outer_pte = outer_page_table[virtual_addr.outer_page_number];
 
-            // If outer page table valid bit is 1, access the inner page
-            // table
+            if (outer_pte.valid) {
+                auto inner_page_table =
+                    InnerPageTable(myPhyMem, outer_pte.inner_table_addr);
+                auto inner_pte =
+                    inner_page_table[virtual_addr.inner_page_number];
 
-            // Return valid bit in outer and inner page table, physical
-            // address, and value stored in the physical memory. Each line
-            // in the output file for example should be: 1, 0, 0x000,
-            // 0x00000000
+                if (inner_pte.valid) {
+                    auto phy_addr = PhysicalAddress(inner_pte.frame_num,
+                                                    virtual_addr.offset);
+                    tracesout << std::hex << "1, 1, 0x" << std::setfill('0')
+                              << std::setw(3) << phy_addr << ", 0x"
+                              << std::setw(8) << myPhyMem[phy_addr] << std::dec
+                              << endl;
+                } else {
+                    tracesout << "1, 0, 0x000, 0x00000000" << endl;
+                }
+            } else {
+                tracesout << "0, 0, 0x000, 0x00000000" << endl;
+            }
         }
         traces.close();
         tracesout.close();

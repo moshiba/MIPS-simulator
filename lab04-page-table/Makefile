@@ -6,5 +6,7 @@ debug: PageTable.cpp
 	g++ -g -DDEBUG ${CXXFLAGS} PageTable.cpp -o PageTable.out
 run:
 	cd sample && ./PageTable pt_requests.txt PTBR.txt
+diff:
+	vimdiff sample/pt_results.txt sample/expected_results/pt_results.ans.txt
 clean:
 	rm -r PageTable.out.dSYM
