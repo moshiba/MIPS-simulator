@@ -252,22 +252,22 @@ int main([[maybe_unused]] int argc, char* argv[]) {
             const auto virtual_addr_bits = bitset< 14 >(line);
             const auto virtual_addr =
                 VirtualAddress(virtual_addr_bits.to_ulong());
-
-            auto outer_pte = outer_page_table[virtual_addr.outer_page_number];
+            const auto outer_pte =
+                outer_page_table[virtual_addr.outer_page_number];
 
             if (outer_pte.valid) {
                 auto inner_page_table =
                     InnerPageTable(myPhyMem, outer_pte.inner_table_addr);
-                auto inner_pte =
+                const auto inner_pte =
                     inner_page_table[virtual_addr.inner_page_number];
 
                 if (inner_pte.valid) {
                     auto phy_addr = PhysicalAddress(inner_pte.frame_num,
                                                     virtual_addr.offset);
-                    tracesout << std::hex << "1, 1, 0x" << std::setfill('0')
+                    tracesout << std::hex << std::setfill('0') << "1, 1, 0x"
                               << std::setw(3) << phy_addr << ", 0x"
-                              << std::setw(8) << myPhyMem[phy_addr] << std::dec
-                              << endl;
+                              << std::setw(8) << myPhyMem[phy_addr] << endl;
+                    std::cout.copyfmt(oldCoutState);
                 } else {
                     tracesout << "1, 0, 0x000, 0x00000000" << endl;
                 }
