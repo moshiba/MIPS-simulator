@@ -225,7 +225,7 @@ class InnerPageTable {
 };
 
 int main([[maybe_unused]] int argc, char* argv[]) {
-    PhysicalMemory myPhyMem;
+    PhysicalMemory phy_mem;
 
     ifstream traces;
     ifstream PTB_file;
@@ -242,7 +242,7 @@ int main([[maybe_unused]] int argc, char* argv[]) {
     bitset< 12 > PTBR;
     PTB_file >> PTBR;
 
-    auto outer_page_table = OuterPageTable(myPhyMem, PTBR.to_ulong());
+    auto outer_page_table = OuterPageTable(phy_mem, PTBR.to_ulong());
 
     // Read a virtual address form the PageTable and convert it to the
     // physical address
@@ -257,7 +257,7 @@ int main([[maybe_unused]] int argc, char* argv[]) {
 
             if (outer_pte.valid) {
                 auto inner_page_table =
-                    InnerPageTable(myPhyMem, outer_pte.inner_table_addr);
+                    InnerPageTable(phy_mem, outer_pte.inner_table_addr);
                 const auto inner_pte =
                     inner_page_table[virtual_addr.inner_page_number];
 
@@ -266,7 +266,7 @@ int main([[maybe_unused]] int argc, char* argv[]) {
                                                     virtual_addr.offset);
                     tracesout << std::hex << std::setfill('0') << "1, 1, 0x"
                               << std::setw(3) << phy_addr << ", 0x"
-                              << std::setw(8) << myPhyMem[phy_addr] << endl;
+                              << std::setw(8) << phy_mem[phy_addr] << endl;
                     std::cout.copyfmt(oldCoutState);
                 } else {
                     tracesout << "1, 0, 0x000, 0x00000000" << endl;
