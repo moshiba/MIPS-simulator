@@ -67,11 +67,13 @@ std::ios oldCoutState(nullptr);
 
 using namespace std;
 
-#define MemSize (65536)
+constexpr const int MemSize = 65536;
 
-class PhyMem {
+constexpr long bitmask(unsigned n) { return (1UL << n) - 1; }
+
+class PhysicalMemory {
    public:
-    PhyMem() {
+    PhysicalMemory() {
         DMem.resize(MemSize);
         ifstream dmem;
         string line;
@@ -87,21 +89,26 @@ class PhyMem {
         dmem.close();
     }
 
+    unsigned operator[](int index) {
+        if (index >= (1 << 12)) {
+            throw std::out_of_range("Memory access out of range");
+        }
+        return DMem[index + 0].to_ulong() << 24 |
+               DMem[index + 1].to_ulong() << 16 |
+               DMem[index + 2].to_ulong() << 8 |
+               DMem[index + 3].to_ulong() << 0;
+    }
+
     bitset< 32 > outputMemValue(bitset< 12 > address_bits) {
-        unsigned address = address_bits.to_ulong();
-        bitset< 32 > readdata = DMem[address + 0].to_ulong() << 24 |
-                                DMem[address + 1].to_ulong() << 16 |
-                                DMem[address + 2].to_ulong() << 8 |
-                                DMem[address + 3].to_ulong() << 0;
-        return readdata;
+        return bitset< 32 >((*this)[address_bits.to_ulong()]);
     }
 
    private:
     vector< bitset< 8 > > DMem;
 };
 
-int main(int argc, char *argv[]) {
-    PhyMem myPhyMem;
+int main(int argc, char* argv[]) {
+    PhysicalMemory myPhyMem;
 
     ifstream traces;
     ifstream PTB_file;
@@ -119,24 +126,25 @@ int main(int argc, char *argv[]) {
     PTB_file >> PTBR;
 
     string line;
-    bitset< 14 > virtualAddr;
 
-    /*********************************** ↓↓↓ Todo: Implement by you ↓↓↓
-     * ******************************************/
-
-    // Read a virtual address form the PageTable and convert it to the physical
-    // address
+    // Read a virtual address form the PageTable and convert it to the
+    // physical address
     if (traces.is_open() && tracesout.is_open()) {
         while (getline(traces, line)) {
+            const auto virtual_addr_bits = bitset< 14 >(line);
+            const auto virtual_addr =
+                VirtualAddress(virtual_addr_bits.to_ulong());
+
             // TODO: Implement!
             //  Access the outer page table
 
-            // If outer page table valid bit is 1, access the inner page table
+            // If outer page table valid bit is 1, access the inner page
+            // table
 
-            // Return valid bit in outer and inner page table, physical address,
-            // and value stored in the physical memory.
-            //  Each line in the output file for example should be: 1, 0, 0x000,
-            //  0x00000000
+            // Return valid bit in outer and inner page table, physical
+            // address, and value stored in the physical memory. Each line
+            // in the output file for example should be: 1, 0, 0x000,
+            // 0x00000000
         }
         traces.close();
         tracesout.close();
