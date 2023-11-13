@@ -177,6 +177,7 @@ class PhysicalAddress {
    public:
     PhysicalAddress(unsigned frame_number_, unsigned frame_offset_)
         : frame_number(frame_number_), frame_offset(frame_offset_) {}
+
     operator unsigned() { return frame_number << 6 | frame_offset; }
 
     unsigned frame_number;
@@ -223,7 +224,7 @@ class InnerPageTable {
     unsigned pt_addr;
 };
 
-int main(int argc, char* argv[]) {
+int main([[maybe_unused]] int argc, char* argv[]) {
     PhysicalMemory myPhyMem;
 
     ifstream traces;
@@ -280,6 +281,4 @@ int main(int argc, char* argv[]) {
 
     else
         cout << "Unable to open trace or traceout file ";
-
-    return 0;
 }
