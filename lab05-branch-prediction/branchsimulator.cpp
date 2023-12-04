@@ -22,7 +22,10 @@ class BHT {
     friend ostream& operator<<(ostream& os, const BHT& bht);
 
    public:
-    BHT(int w, int h) : entries(pow(2, h), 0), max_entry_val(pow(2, w) - 1) {}
+    BHT(int w, int h)
+        : n_entries(pow(2, h)),
+          entries(n_entries, 0),
+          max_entry_val(pow(2, w) - 1) {}
 
     void update_state(bool branch_outcome, int bht_address) {
         if ((size_t)bht_address > entries.size() - 1) {
@@ -38,13 +41,14 @@ class BHT {
     }
 
     int operator[](int index) {
-        if ((index < 0) || (index >= static_cast< int >(entries.size()))) {
+        if ((index < 0) || (index >= n_entries)) {
             throw out_of_range("BHT [] index out of range");
         }
         return entries[index];
     }
 
    private:
+    int n_entries;
     vector< int > entries;
     int max_entry_val;
 };
@@ -60,7 +64,8 @@ class PHT {
     friend ostream& operator<<(ostream& os, const PHT& pht);
 
    public:
-    PHT(int m) : entries(pow(2, m), SaturatingCounter()) {}
+    PHT(int m)
+        : n_entries(pow(2, m)), entries(n_entries, SaturatingCounter()) {}
     void update_state(bool branch_outcome, int pht_address) {
         if ((size_t)pht_address > entries.size() - 1) {
             cerr << "Invalid PHT address" << endl;
@@ -83,7 +88,15 @@ class PHT {
         }
     }
 
+    auto operator[](int index) {
+        if ((index < 0) || (index >= n_entries)) {
+            throw out_of_range("PHT [] index out of range");
+        }
+        return entries[index];
+    }
+
    private:
+    int n_entries;
     vector< SaturatingCounter > entries;
 };
 
