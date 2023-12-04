@@ -18,9 +18,8 @@ class SaturatingCounter {
     void not_taken() { state = max(0, state - 1); }
 };
 
-class BHT {
-    friend ostream& operator<<(ostream& os, const BHT& bht);
 
+class BHT {
    public:
     BHT(int w, int h)
         : n_entries(pow(2, h)),
@@ -47,25 +46,25 @@ class BHT {
         return entries[index];
     }
 
+    friend ostream& operator<<(ostream& os, const BHT& bht) {
+        for (size_t i = 0; i < bht.entries.size(); ++i) {
+            cout << bht.entries[i] << endl;
+        }
+        return os;
+    }
+
    private:
     int n_entries;
     vector< int > entries;
     int max_entry_val;
 };
 
-ostream& operator<<(ostream& os, const BHT& bht) {
-    for (size_t i = 0; i < bht.entries.size(); ++i) {
-        cout << bht.entries[i] << endl;
-    }
-    return os;
-}
 
 class PHT {
-    friend ostream& operator<<(ostream& os, const PHT& pht);
-
    public:
     PHT(int m)
         : n_entries(pow(2, m)), entries(n_entries, SaturatingCounter()) {}
+
     void update_state(bool branch_outcome, int pht_address) {
         if ((size_t)pht_address > entries.size() - 1) {
             cerr << "Invalid PHT address" << endl;
@@ -95,17 +94,17 @@ class PHT {
         return entries[index];
     }
 
+    friend ostream& operator<<(ostream& os, const PHT& pht) {
+        for (size_t i = 0; i < pht.entries.size(); ++i) {
+            cout << pht.entries[i].state << endl;
+        }
+        return os;
+    }
+
    private:
     int n_entries;
-    vector< SaturatingCounter > entries;
+    vector<SaturatingCounter> entries;
 };
-
-ostream& operator<<(ostream& os, const PHT& pht) {
-    for (size_t i = 0; i < pht.entries.size(); ++i) {
-        cout << pht.entries[i].state << endl;
-    }
-    return os;
-}
 
 int main([[maybe_unused]] int argc, char** argv) {
     int m, w, h;
