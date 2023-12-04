@@ -10,7 +10,9 @@ diff:
 	diff trace.txt.out expected_results/trace.txt.out.ans.txt
 vimdiff:
 	vimdiff trace.txt.out expected_results/trace.txt.out.ans.txt
+linediff:
+	vimdiff <( nl trace.txt.out ) <( nl expected_results/trace.txt.out.ans.txt )
 clean:
-	rm -r branchsimulator.out.dSYM
+	rm -r branchsimulator.out.dSYM branchsimulator.out
 test:
 	make debug && make run && make diff || make vimdiff
