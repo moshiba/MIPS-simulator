@@ -9,15 +9,30 @@
 
 using namespace std;
 
-class SaturatingCounter {
-   public:
-    SaturatingCounter() = default;
-    int state = 2;
+constexpr long bitmask(unsigned n) { return (1UL << n) - 1; }
 
-    void taken() { state = min(3, state + 1); }
-    void not_taken() { state = max(0, state - 1); }
+struct Config {
+    int m;
+    int h;
+    int w;
+
+    friend ostream& operator<<(ostream& os, const Config& cfg) {
+        os << "@@@@@\n cfg\n@@@@@\nm: ";
+        os << cfg.m << "\nw: " << cfg.w << "\nh: " << cfg.h;
+        os << "\n@@@@@" << endl;
+        return os;
+    };
 };
 
+class BhtIndex {
+   public:
+    BhtIndex(unsigned addr_, Config cfg)
+        : addr((addr_ >> 2) && bitmask(cfg.h)){};
+
+    operator unsigned() { return addr; }
+
+    unsigned addr;
+};
 
 class BHT {
    public:
@@ -59,6 +74,28 @@ class BHT {
     int max_entry_val;
 };
 
+class PhtIndex {
+   public:
+    PhtIndex(unsigned pc, unsigned bht_entry, Config cfg)
+        : addr((pc >> 2) && bitmask(cfg.m - cfg.w)){};
+
+    operator unsigned() { return addr; }
+
+    unsigned addr;
+};
+
+class SaturatingCounter {
+   public:
+    SaturatingCounter() = default;
+
+    void taken() { state = min(3, state + 1); }
+
+    void not_taken() { state = max(0, state - 1); }
+
+    bool predict() { return state >= 2; }
+
+    int state = 2;
+};
 
 class PHT {
    public:
@@ -107,14 +144,11 @@ class PHT {
 };
 
 int main([[maybe_unused]] int argc, char** argv) {
-    int m, w, h;
+    Config cfg;
     {
-        ifstream config(argv[1]);
-        config >> m >> h >> w;
-        config.close();
-        cout << "@@@@@\n cfg\n@@@@@\nm: ";
-        cout << m << "\nw: " << w << "\nh: " << h;
-        cout << "\n@@@@@" << endl;
+        ifstream config_f(argv[1]);
+        config_f >> cfg.m >> cfg.h >> cfg.w;
+        cout << cfg;
     }
 
     PHT my_pht(m);
