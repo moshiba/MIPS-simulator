@@ -1,7 +1,6 @@
-#include <math.h>
-
 #include <algorithm>
 #include <bitset>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -93,23 +92,16 @@ ostream& operator<<(ostream& os, const PHT& pht) {
     return os;
 }
 
-int main(int argc, char** argv) {
-    ifstream config;
-    config.open(argv[1]);
-
+int main([[maybe_unused]] int argc, char** argv) {
     int m, w, h;
-    config >> m;
-    config >> h;
-    config >> w;
-
-    config.close();
-
-    ofstream out;
-    string out_file_name = string(argv[2]) + ".out";
-    out.open(out_file_name.c_str());
-
-    ifstream trace;
-    trace.open(argv[2]);
+    {
+        ifstream config(argv[1]);
+        config >> m >> h >> w;
+        config.close();
+        cout << "@@@@@\n cfg\n@@@@@\nm: ";
+        cout << m << "\nw: " << w << "\nh: " << h;
+        cout << "\n@@@@@" << endl;
+    }
 
     PHT my_pht(m);
     // cout << "The PHT looks like this when initialized: \n" << my_pht << endl;
@@ -132,27 +124,15 @@ int main(int argc, char** argv) {
     // my_bht.update_state(1, 3);
     // cout << "BHT update test: \n" << my_bht << endl;
 
+    ofstream out((string(argv[2]) + ".out").c_str());
+    ifstream trace(argv[2]);
     int address;
     int branch_outcome;
-    string address_line;
-    string branch_line;
     int count = 0;
-    // TODO: Implement a two-level branch predictor
-    while (!trace.eof()) {
-        branch_line = "";
-        bool space_flag = 0;
-        getline(trace, address_line);
-        // cout << address_line << endl;
-        for (size_t i = 0; i < address_line.size(); ++i) {
-            if (space_flag == 1) {
-                branch_line.push_back(address_line[i]);
-            }
-            if (address_line[i] == ' ') {
-                space_flag = 1;
-            }
-        }
-        address = stoi(address_line, nullptr, 16);
-        branch_outcome = stoi(branch_line, nullptr, 2);
+    while (trace >> hex >> address >> dec >> branch_outcome) {
+        cout << "addr: 0x" << hex << address;
+        cout << " - branch: " << dec << branch_outcome << endl;
+
         int bht_address = (address >> 2) & (int)(pow(2, h) - 1);
 
         int pht_addr_upper = (address >> 2) & (int)(pow(2, m - w) - 1);
@@ -175,5 +155,3 @@ int main(int argc, char** argv) {
     trace.close();
     out.close();
 }
-
-// Path: branchsimulator_skeleton_23.cpp
