@@ -3,6 +3,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,7 @@ class BHT {
 
    public:
     BHT(int w, int h) : entries(pow(2, h), 0), max_entry_val(pow(2, w) - 1) {}
+
     void update_state(bool branch_outcome, int bht_address) {
         if ((size_t)bht_address > entries.size() - 1) {
             cerr << "Invalid BHT address" << endl;
@@ -34,12 +36,12 @@ class BHT {
         new_entry &= max_entry_val;  // ensure entries don't exceed max val
         entries[bht_address] = new_entry;
     }
+
     int operator[](int index) {
-        if ((index >= 0) && ((size_t)index < entries.size())) {
-            return entries[index];
-        } else {
-            return -1;
+        if ((index < 0) || (index >= static_cast< int >(entries.size()))) {
+            throw out_of_range("BHT [] index out of range");
         }
+        return entries[index];
     }
 
    private:
