@@ -1,5 +1,6 @@
 #include <math.h>
 
+#include <algorithm>
 #include <bitset>
 #include <fstream>
 #include <iostream>
@@ -7,6 +8,15 @@
 #include <vector>
 
 using namespace std;
+
+class SaturatingCounter {
+   public:
+    SaturatingCounter() = default;
+    int state = 2;
+
+    void taken() { state = min(3, state + 1); }
+    void not_taken() { state = max(0, state - 1); }
+};
 
 class BHT {
     friend ostream& operator<<(ostream& os, const BHT& bht);
@@ -49,41 +59,23 @@ class PHT {
     friend ostream& operator<<(ostream& os, const PHT& pht);
 
    public:
-    PHT(int m) : entries(pow(2, m), bitset< 2 >(2)) {}
+    PHT(int m) : entries(pow(2, m), SaturatingCounter()) {}
     void update_state(bool branch_outcome, int pht_address) {
         if ((size_t)pht_address > entries.size() - 1) {
             cerr << "Invalid PHT address" << endl;
             return;
         }
-        if (entries[pht_address] == 0) {  // strongly not taken
-            if (branch_outcome == 0) {
-                // no change
-            } else {
-                entries[pht_address] = 1;  // weakly not taken
-            }
-        } else if (entries[pht_address] == 1) {  // weakly not taken
-            if (branch_outcome == 0) {
-                entries[pht_address] = 0;  // strongly not taken
-            } else {
-                entries[pht_address] = 2;  // weakly taken
-            }
-        } else if (entries[pht_address] == 2) {  // weakly taken
-            if (branch_outcome == 0) {
-                entries[pht_address] = 1;  // weakly not taken
-            } else {
-                entries[pht_address] = 3;  // strongly taken
-            }
-        } else {  // strongly taken
-            if (branch_outcome == 0) {
-                entries[pht_address] = 2;  // weakly taken
-            } else {
-                // no change
-            }
+
+        auto& counter = entries[pht_address];
+        if (branch_outcome == 1) {
+            counter.taken();
+        } else {
+            counter.not_taken();
         }
     }
+
     bool make_prediction(int pht_address) {
-        if ((entries[pht_address] == 0) ||
-            (entries[pht_address] == 1)) {  // not taken
+        if (entries[pht_address].state < 2) {  // not taken
             return 0;
         } else {
             return 1;
@@ -91,12 +83,12 @@ class PHT {
     }
 
    private:
-    vector< bitset< 2 > > entries;
+    vector< SaturatingCounter > entries;
 };
 
 ostream& operator<<(ostream& os, const PHT& pht) {
     for (size_t i = 0; i < pht.entries.size(); ++i) {
-        cout << pht.entries[i] << endl;
+        cout << pht.entries[i].state << endl;
     }
     return os;
 }
