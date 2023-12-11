@@ -1,10 +1,14 @@
-#include <assert.h>
-
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <map>
+#include <optional>
+#include <ostream>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 #ifdef DEBUG
@@ -74,14 +78,8 @@ using namespace std;
 constexpr long bitmask(unsigned n) { return (1UL << n) - 1; }
 
 string inputtracename = "trace.txt";
-// remove the ".txt" and add ".out.txt" to the end as output name
-string outputtracename =
-    inputtracename.substr(0, inputtracename.length() - 4) + ".out.txt";
+string outputtracename = "trace.out.txt";
 string hardwareconfigname = "config.txt";
-
-enum Operation { ADD, SUB, MULT, DIV, LOAD, STORE };
-// The execute cycle of each operation: ADD, SUB, MULT, DIV, LOAD, STORE
-const int OperationCycle[6] = {2, 2, 10, 40, 2, 2};
 
 struct HardwareConfig {
     int LoadRSsize;   // number of load reservation stations
@@ -89,24 +87,108 @@ struct HardwareConfig {
     int AddRSsize;    // number of add reservation stations
     int MultRSsize;   // number of multiply reservation stations
     int FRegSize;     // number of fp registers
+
+    friend ostream& operator<<(ostream& os, const HardwareConfig& cfg) {
+        os << "@@@@@@@@@@\n  Config\n@@@@@@@@@@\n";
+        os << "Load : " << cfg.LoadRSsize << " RS\n";
+        os << "Store: " << cfg.StoreRSsize << " RS\n";
+        os << "Add  : " << cfg.AddRSsize << " RS\n";
+        os << "Mult : " << cfg.MultRSsize << " RS\n";
+        os << "Float: " << cfg.FRegSize << " Reg\n";
+        os << "@@@@@@@@@@" << endl;
+        return os;
+    }
 };
 
-// We use the following structure to record the time of each instruction
 struct InstructionStatus {
     int cycleIssued;
-    int cycleExecuted;  // execution completed
+    int cycleCompleted;
     int cycleWriteResult;
 };
 
-// Register Result Status structure
+enum class Instruction_t { Add, Sub, Load, Store, Mult, Div };
+
+enum class FunctionalUnit_t { Load, Store, AddSub, MultDiv };
+
+class Instruction {
+   public:
+    Instruction(string line_str) : line(line_str) {
+        auto line = istringstream(line_str);
+        string buf_instr, buf_dest, buf_src1, buf_src2;
+        line >> buf_instr >> buf_dest >> buf_src1 >> buf_src2;
+        dest = stoi(buf_dest.substr(1));
+        status = {-1, -1, -1};
+
+        switch (tolower(buf_instr[2])) {
+            case 'd': {
+                type = Instruction_t::Add;
+                fu_cat = FunctionalUnit_t::AddSub;
+                latency = 2;
+                src1 = stoi(buf_src1.substr(1));
+                src2 = stoi(buf_src2.substr(1));
+                break;
+            }
+            case 'b': {
+                type = Instruction_t::Sub;
+                fu_cat = FunctionalUnit_t::AddSub;
+                latency = 2;
+                src1 = stoi(buf_src1.substr(1));
+                src2 = stoi(buf_src2.substr(1));
+                break;
+            }
+            case 'a': {
+                type = Instruction_t::Load;
+                fu_cat = FunctionalUnit_t::Load;
+                latency = 2;
+                src1 = stoi(buf_src1);
+                src2 = stoi(buf_src2);
+                break;
+            }
+            case 'o': {
+                type = Instruction_t::Store;
+                fu_cat = FunctionalUnit_t::Store;
+                latency = 2;
+                src1 = stoi(buf_src1);
+                src2 = stoi(buf_src2);
+                break;
+            }
+            case 'l': {
+                type = Instruction_t::Mult;
+                fu_cat = FunctionalUnit_t::MultDiv;
+                latency = 10;
+                src1 = stoi(buf_src1.substr(1));
+                src2 = stoi(buf_src2.substr(1));
+                break;
+            }
+            case 'v': {
+                type = Instruction_t::Div;
+                fu_cat = FunctionalUnit_t::MultDiv;
+                latency = 40;
+                src1 = stoi(buf_src1.substr(1));
+                src2 = stoi(buf_src2.substr(1));
+                break;
+            }
+            default: {
+                cerr << "instruction: " << line_str << endl;
+                throw runtime_error("invalid instruction");
+            }
+        }
+    }
+
+    string line;
+    Instruction_t type;
+    FunctionalUnit_t fu_cat;
+    unsigned latency;
+    unsigned dest;
+    unsigned src1;
+    unsigned src2;
+    InstructionStatus status;
+};
+
 struct RegisterResultStatus {
     string ReservationStationName;
     bool dataReady;
 };
-
-/*********************************** ↓↓↓ Todo: Implement by you ↓↓↓
- * ******************************************/
-struct Instruction;
 
 class RegisterResultStatuses {
    public:
@@ -137,21 +219,81 @@ class RegisterResultStatuses {
     vector< RegisterResultStatus > _registers;
 };
 
-// Define your Reservation Station structure
-struct ReservationStation {
-    // ...
-};
-class ReservationStations {
-   public:
-    // ...
-   private:
-    vector< ReservationStation > _stations;
+struct ReservationStationId {
+    FunctionalUnit_t rs_type;
+    unsigned index;
 };
 
-class CommonDataBus {
+class ReservationStation {
    public:
-    // ...
+    ReservationStation(ReservationStationId rs_idx)
+        : reservation_station_index(rs_idx) {
+        this->clear();
+    }
+
+    bool ready() {
+        return (!(Qj) && !(Qk)) && (Vj.has_value() && Vk.has_value());
+    }
+
+    bool complete() { return remain_cycle.value() == 0; }
+
+    void clear() {
+        busy = false;
+        Op.reset();
+        Vj.reset();
+        Vk.reset();
+        Qj.reset();
+        Qk.reset();
+        remain_cycle.reset();
+    }
+
+    bool free() { return !busy; }
+
+    ReservationStationId reservation_station_index;
+
+   private:
+    bool busy;
+    optional< Instruction_t > Op;         // Operation
+    optional< unsigned > Vj;              // Value j
+    optional< unsigned > Vk;              // Value k
+    optional< ReservationStationId > Qj;  // Dependee source j
+    optional< ReservationStationId > Qk;  // Dependee source k
+    optional< int > remain_cycle;
 };
+
+class ReservationStations {
+   public:
+    auto& operator[](FunctionalUnit_t&& key) { return stations[key]; }
+
+    auto& operator[](ReservationStationId&& key) {
+        return stations[key.rs_type][key.index];
+    }
+
+    map< FunctionalUnit_t, vector< ReservationStation > > stations;
+};
+
+struct CommonDataBus {
+   public:
+    FunctionalUnit_t source;
+    unsigned data;
+};
+
+/*
+print the register result status each 5 cycles
+@param filename: output file name
+@param registerResultStatus: register result status
+@param thiscycle: current cycle
+*/
+void PrintRegisterResultStatus4Grade(
+    const string& filename, const RegisterResultStatuses& registerResultStatus,
+    const int thiscycle) {
+    if (thiscycle % 5 != 0) return;
+    std::ofstream outfile(
+        filename, std::ios_base::app);  // append result to the end of file
+    outfile << "Cycle " << thiscycle << ":\n";
+    outfile << registerResultStatus._printRegisterResultStatus() << "\n";
+    outfile.close();
+}
 
 // Function to simulate the Tomasulo algorithm
 void simulateTomasulo() {
@@ -195,7 +337,7 @@ void PrintResult4Grade(const string& filename,
     for (int idx = 0; idx < instructionStatus.size(); idx++) {
         outfile << "Instr" << idx << ": ";
         outfile << "Issued: " << instructionStatus[idx].cycleIssued << ", ";
-        outfile << "Completed: " << instructionStatus[idx].cycleExecuted
+        outfile << "Completed: " << instructionStatus[idx].cycleCompleted
                 << ", ";
         outfile << "Write Result: " << instructionStatus[idx].cycleWriteResult
                 << ", ";
@@ -204,25 +346,25 @@ void PrintResult4Grade(const string& filename,
     outfile.close();
 }
 
-/*
-print the register result status each 5 cycles
-@param filename: output file name
-@param registerResultStatus: register result status
-@param thiscycle: current cycle
-*/
-void PrintRegisterResultStatus4Grade(
-    const string& filename, const RegisterResultStatuses& registerResultStatus,
-    const int thiscycle) {
-    if (thiscycle % 5 != 0) return;
-    std::ofstream outfile(
-        filename, std::ios_base::app);  // append result to the end of file
-    outfile << "Cycle " << thiscycle << ":\n";
-    outfile << registerResultStatus._printRegisterResultStatus() << "\n";
-    outfile.close();
-}
+class InstructionTrace {
+   public:
+    InstructionTrace(string trace_file_name) {
+        ifstream trace_file(trace_file_name);
+        for (string trace_line; getline(trace_file, trace_line);) {
+            instr_trace.emplace_back(trace_line);
+        }
+    }
+
+    auto instruction() { return instr_trace[instr_idx]; }
+    void advance_to_next_instruction() { instr_idx += 1; }
+
+   private:
+    vector< Instruction > instr_trace;
+    unsigned instr_idx = 0;
+};
 
 int main(int argc, char** argv) {
-    if (argc > 1) {
+    if (argc > 3) {
         hardwareconfigname = argv[1];
         inputtracename = argv[2];
     }
