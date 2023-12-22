@@ -7,13 +7,13 @@ debug: tomasulosimulator.cpp
 run:
 	./tomasulosimulator.out config.txt trace.txt
 diff:
-	diff trace.txt.out expected_results/trace.txt.out.ans.txt
+	diff trace.out.txt expected_results/trace.out.txt.ans.txt
 vimdiff:
-	vimdiff trace.txt.out expected_results/trace.txt.out.ans.txt
+	vimdiff trace.out.txt expected_results/trace.out.txt.ans.txt
 linediff:
-	vimdiff <( nl trace.txt.out ) <( nl expected_results/trace.txt.out.ans.txt )
+	vimdiff <( nl trace.out.txt ) <( nl expected_results/trace.out.txt.ans.txt )
 clean:
-	rm -r branchsimulator.out.dSYM branchsimulator.out
+	rm -r branchsimulator.out.dSYM branchsimulator.out trace.out.txt
 test:
 	make debug && make run && make diff || make vimdiff
 
