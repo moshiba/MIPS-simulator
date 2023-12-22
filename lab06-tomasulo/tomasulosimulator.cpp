@@ -430,34 +430,77 @@ int main(int argc, char** argv) {
     unsigned cycle = 1;
     while (1 && cycle < 60) {  // TODO: fix while loop
         dout << "\n\n========\ncycle " << cycle << "\n========" << endl;
-        // Broadcast what's in CDB to all registers and all RS
         {
-            if (cdb.has_value()) {
-                const auto& cdb_val = cdb.value();
-                dout << debug::bg::blue << "CDB broadcasting (" << cdb_val
-                     << ") to:" << debug::reset << endl;
+            // Retire the oldest instruction first: bus arbitration
+            {
+                vector< ReservationStation > completed_rs;
                 for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
-                    for (auto&& rs : rs_vec) {  // for every RS of that type
-                        // if CDB has something Qj is waiting for
-                        if (rs.Qj == cdb_val) {
-                            dout << "  " << rs.rs_id << " Qj" << endl;
-                            rs.Qj.reset();
-                        }
-                        // if CDB has something Qk is waiting for
-                        if (rs.Qk == cdb_val) {
-                            dout << "  " << rs.rs_id << " Qk" << endl;
-                            rs.Qk.reset();
+                    copy_if(
+                        rs_vec.begin(), rs_vec.end(),
+                        back_inserter(completed_rs),
+                        [](ReservationStation& rs) { return rs.completed(); });
+                }
+                if (completed_rs.empty()) {
+                    dout << debug::bg::red
+                         << "nothing is completed during this round"
+                         << debug::reset << endl;
+                } else {
+                    // Find the oldest completed instruction
+                    const auto& min_completed_rs = *min_element(
+                        completed_rs.begin(), completed_rs.end(),
+                        [](ReservationStation& rs_A, ReservationStation& rs_B) {
+                            return rs_A.Op->index < rs_B.Op->index;
+                        });
+
+                    // Broadcast this RS to CDB
+                    // - Retrace ReservationStationId from instruction
+                    const auto& rs_idx = min_completed_rs.rs_id;
+                    dout << debug::bg::cyan << rs_idx
+                         << " commit (broadcast in next round)" << debug::reset
+                         << endl;
+                    cdb = rs_idx;
+
+                    // Retire this instruction
+                    // - Mark broadcast timestamp
+                    instr_trace.instr_trace[min_completed_rs.Op->index]
+                        .status.cycleWriteResult = cycle;
+                    // - Clear the original RS in RSS
+                    find(begin(rss.stations[rs_idx.rs_type]),
+                         end(rss.stations[rs_idx.rs_type]), min_completed_rs)
+                        ->clear();
+                }
+            }
+
+            // Broadcast what's in CDB to all registers and all RS
+            {
+                if (cdb.has_value()) {
+                    const ReservationStationId& cdb_val = cdb.value();
+                    dout << debug::bg::blue << "CDB broadcasting (" << cdb_val
+                         << ") to:" << debug::reset << endl;
+                    for (auto&& [fu, rs_vec] :
+                         rss.stations) {            // for every RS type
+                        for (auto&& rs : rs_vec) {  // for every RS of that type
+                            // if CDB has something Qj is waiting for
+                            if (rs.Qj == cdb_val) {
+                                dout << "  " << rs.rs_id << " Qj" << endl;
+                                rs.Qj.reset();
+                            }
+                            // if CDB has something Qk is waiting for
+                            if (rs.Qk == cdb_val) {
+                                dout << "  " << rs.rs_id << " Qk" << endl;
+                                rs.Qk.reset();
+                            }
                         }
                     }
-                }
-                for (auto&& reg : reg_stats.registers) {
-                    // if CDB has something that any register is waiting for
-                    if (reg.rs_id == cdb_val) {
-                        dout << "  " << reg.rs_id.value() << " Reg" << endl;
-                        reg.data_ready = true;
+                    for (auto&& reg : reg_stats.registers) {
+                        // if CDB has something that any register is waiting for
+                        if (reg.rs_id == cdb_val) {
+                            dout << "  " << reg.rs_id.value() << " Reg" << endl;
+                            reg.data_ready = true;
+                        }
                     }
+                    cdb.reset();
                 }
-                cdb.reset();
             }
         }
 
@@ -485,43 +528,6 @@ int main(int argc, char** argv) {
                             .status.cycleCompleted = cycle;
                     }
                 }
-            }
-
-            // Retire the oldest instruction first: bus arbitration
-            vector< ReservationStation > completed_rs;
-            for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
-                copy_if(rs_vec.begin(), rs_vec.end(),
-                        back_inserter(completed_rs),
-                        [](ReservationStation& rs) { return rs.completed(); });
-            }
-            if (completed_rs.empty()) {
-                dout << debug::bg::red
-                     << "nothing is completed during this round" << debug::reset
-                     << endl;
-            } else {
-                // Find the oldest completed instruction
-                const auto& min_completed_rs = *min_element(
-                    completed_rs.begin(), completed_rs.end(),
-                    [](ReservationStation& rs_A, ReservationStation& rs_B) {
-                        return rs_A.Op->index < rs_B.Op->index;
-                    });
-
-                // Broadcast this RS to CDB
-                // - Retrace ReservationStationId from instruction
-                const auto& rs_idx = min_completed_rs.rs_id;
-                dout << debug::bg::cyan << rs_idx
-                     << " commit (broadcast in next round)" << debug::reset
-                     << endl;
-                cdb = rs_idx;
-
-                // Retire this instruction
-                // - Mark broadcast timestamp
-                instr_trace.instr_trace[min_completed_rs.Op->index]
-                    .status.cycleWriteResult = cycle + 1;
-                // - Clear the original RS in RSS
-                find(begin(rss.stations[rs_idx.rs_type]),
-                     end(rss.stations[rs_idx.rs_type]), min_completed_rs)
-                    ->clear();
             }
         }
 
