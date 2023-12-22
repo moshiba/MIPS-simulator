@@ -455,9 +455,8 @@ int main(int argc, char** argv) {
                     // Broadcast this RS to CDB
                     // - Retrace ReservationStationId from instruction
                     const auto& rs_idx = min_completed_rs.rs_id;
-                    dout << debug::bg::cyan << rs_idx
-                         << " commit (broadcast in next round)" << debug::reset
-                         << endl;
+                    dout << debug::bg::cyan << rs_idx << " commit (broadcast)"
+                         << debug::reset << endl;
                     cdb = rs_idx;
 
                     // Retire this instruction
@@ -484,11 +483,13 @@ int main(int argc, char** argv) {
                             if (rs.Qj == cdb_val) {
                                 dout << "  " << rs.rs_id << " Qj" << endl;
                                 rs.Qj.reset();
+                                rs.Vj = 1;
                             }
                             // if CDB has something Qk is waiting for
                             if (rs.Qk == cdb_val) {
                                 dout << "  " << rs.rs_id << " Qk" << endl;
                                 rs.Qk.reset();
+                                rs.Vk = 1;
                             }
                         }
                     }
@@ -511,7 +512,8 @@ int main(int argc, char** argv) {
             for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
                 for (auto&& rs : rs_vec) {  // for every RS of that type
                     if (rs.ready()) {
-                        dout << rs.rs_id << " is running" << endl;
+                        dout << debug::bg::magenta << rs.rs_id << " is running"
+                             << debug::reset << endl;
                         *rs.remain_cycle -= 1;
                     }
                 }
@@ -521,7 +523,7 @@ int main(int argc, char** argv) {
             for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
                 for (auto&& rs : rs_vec) {  // for every RS of that type
                     if (rs.completed()) {
-                        dout << debug::bg::green << rs.rs_id << " is completed"
+                        dout << debug::bg::green << rs.rs_id << " completed"
                              << debug::reset << endl;
 
                         instr_trace.instr_trace[rs.Op->index]
@@ -575,17 +577,13 @@ int main(int argc, char** argv) {
                             break;
                         }
                         default: {
+                            free_rs->Qj = reg_stats.registers[this_op1].rs_id;
                             if (reg_stats.registers[this_op1].data_ready) {
                                 free_rs->Vj = this_op1;
-                            } else {
-                                free_rs->Qj =
-                                    reg_stats.registers[this_op1].rs_id;
                             }
+                            free_rs->Qk = reg_stats.registers[this_op2].rs_id;
                             if (reg_stats.registers[this_op2].data_ready) {
                                 free_rs->Vk = this_op2;
-                            } else {
-                                free_rs->Qk =
-                                    reg_stats.registers[this_op2].rs_id;
                             }
                             reg_stats.registers[this_dst] = {free_rs->rs_id,
                                                              false};
