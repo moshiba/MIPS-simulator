@@ -37,7 +37,7 @@ debug_cout dout;
 
 bool is_debug() { return nullptr != std::getenv("DEBUG"); }
 
-template < typename T >
+template <typename T>
 debug_cout& operator<<(debug_cout& s, [[maybe_unused]] const T& x) {
 #ifdef DEBUG
     std::cout << x;
@@ -118,9 +118,9 @@ struct InstructionStatus {
 enum class Instruction_t { Add, Sub, Load, Store, Mult, Div };
 
 enum class FunctionalUnit_t { Load, Store, AddSub, MultDiv };
-string FU_to_string(optional< FunctionalUnit_t > fu) {
+string FU_to_string(optional<FunctionalUnit_t> fu) {
     if (fu.has_value()) {
-        auto fu_val = fu.value();
+        FunctionalUnit_t fu_val = fu.value();
         switch (fu_val) {
             case FunctionalUnit_t::Load:
                 return "Load";
@@ -248,6 +248,7 @@ class ReservationStation {
 
     bool completed() const {
         return remain_cycle.has_value() && remain_cycle.value() <= 0;
+        //return !remain_cycle.has_value() && remain_cycle.value() <= 0
     }
 
     void clear() {
@@ -270,12 +271,12 @@ class ReservationStation {
 
     ReservationStationId rs_id;
     bool busy;
-    optional< Instruction > Op;           // Operation
-    optional< unsigned > Vj;              // Value j
-    optional< unsigned > Vk;              // Value k
-    optional< ReservationStationId > Qj;  // Dependee source j
-    optional< ReservationStationId > Qk;  // Dependee source k
-    optional< int > remain_cycle;
+    optional<Instruction> Op;           // Operation
+    optional<unsigned> Vj;              // Value j
+    optional<unsigned> Vk;              // Value k
+    optional<ReservationStationId> Qj;  // Dependee source j
+    optional<ReservationStationId> Qk;  // Dependee source k
+    optional<int> remain_cycle;
 };
 
 class ReservationStations {
@@ -305,7 +306,7 @@ class ReservationStations {
     // auto& operator[](ReservationStationId&& key) { return
     // stations[key.rs_type][key.index]; }
 
-    map< FunctionalUnit_t, vector< ReservationStation > > stations;
+    map<FunctionalUnit_t, vector<ReservationStation>> stations;
 };
 
 struct RegisterResultStatus {
@@ -313,7 +314,7 @@ struct RegisterResultStatus {
     RegisterResultStatus(ReservationStationId rs_id_, bool data_ready_)
         : rs_id(rs_id_), data_ready(data_ready_) {}
 
-    optional< ReservationStationId > rs_id;
+    optional<ReservationStationId> rs_id;
     bool data_ready;
 };
 
@@ -344,7 +345,7 @@ class RegisterResultStatuses {
         return result.str();
     }
 
-    vector< RegisterResultStatus > registers;
+    vector<RegisterResultStatus> registers;
 };
 
 /*
@@ -356,7 +357,7 @@ print the register result status each 5 cycles
 void PrintRegisterResultStatus4Grade(
     const string& filename, const RegisterResultStatuses& registerResultStatus,
     const int thiscycle) {
-    if (thiscycle % 5 != 0) return;
+    if (thiscycle % 5 != 0) return; //Uncomment this before submission
     std::ofstream outfile(
         filename, std::ios_base::app);  // append result to the end of file
     outfile << "Cycle " << thiscycle << ":\n";
@@ -371,7 +372,7 @@ status
 @param instructionStatus: instruction status
 */
 void PrintResult4Grade(const string& filename,
-                       const vector< InstructionStatus >& instructionStatus) {
+                       const vector<InstructionStatus>& instructionStatus) {
     std::ofstream outfile(
         filename, std::ios_base::app);  // append result to the end of file
     outfile << "Instruction Status:\n";
@@ -400,7 +401,7 @@ class InstructionTrace {
     auto&& instruction() { return instr_trace.at(instr_idx); }
     void advance_to_next_instruction() { instr_idx += 1; }
 
-    vector< Instruction > instr_trace;
+    vector<Instruction> instr_trace;
     unsigned instr_idx = 0;
 };
 
@@ -424,16 +425,112 @@ int main(int argc, char** argv) {
 
     ReservationStations rss = {hardwareConfig};
     RegisterResultStatuses reg_stats = {hardwareConfig};
-    optional< ReservationStationId > cdb;
+    optional<ReservationStationId> cdb;
     auto instr_trace = InstructionTrace(inputtracename);
 
     unsigned cycle = 1;
     while (1 && cycle < 60) {  // TODO: fix while loop
         dout << "\n\n========\ncycle " << cycle << "\n========" << endl;
+        cout << "\nCycle: " << cycle << endl;
         {
+            for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
+                for (auto&& rs : rs_vec) {  // for every RS of that type
+                    if (rs.ready()) {
+                        dout << debug::bg::magenta << rs.rs_id << " is running"
+                             << debug::reset << endl;
+                        *rs.remain_cycle -= 1;
+                    }
+                }
+            }
+
+            // Broadcast what's in CDB to all registers and all RS
+            {
+                if (cdb.has_value()) {
+                    const ReservationStationId& cdb_val = cdb.value();
+                    dout << debug::bg::blue << "CDB broadcasting (" << cdb_val
+                         << ") to:" << debug::reset << endl;
+                    cout << "CDB broadcasting (" << cdb_val << ") to: ";
+                    for (auto&& [fu, rs_vec] :
+                         rss.stations) {            // for every RS type
+                        for (auto&& rs : rs_vec) {  // for every RS of that type
+                            // if CDB has something Qj is waiting for
+                            if (rs.Qj == cdb_val) {
+                                dout << "  " << rs.rs_id << " Qj" << endl;
+                                cout << rs.rs_id << " Qj\t";
+                                rs.Qj.reset();
+                                rs.Vj = 1;
+                            }
+                            // if CDB has something Qk is waiting for
+                            if (rs.Qk == cdb_val) {
+                                dout << "  " << rs.rs_id << " Qk" << endl;
+                                cout << rs.rs_id << " Qk\t";
+                                rs.Qk.reset();
+                                rs.Vk = 1;
+                            }
+                        }
+                    }
+                    for (auto&& reg : reg_stats.registers) {
+                        // if CDB has something that any register is waiting for
+                        if (reg.rs_id == cdb_val) {
+                            dout << "  " << reg.rs_id.value() << " Reg" << endl;
+                            cout << reg.rs_id.value() << " Reg\t" << endl;
+                            reg.data_ready = true;
+                        }
+                    }
+                    cdb.reset();
+                }
+
+                //Check the register result status to see if any values are available
+                for(auto&& [fu, rs_vec] : rss.stations){
+                    for(auto&& rs : rs_vec){
+                        for(size_t i=0; i<reg_stats.registers.size(); ++i){
+                            if((rs.Qj == reg_stats.registers[i].rs_id) && reg_stats.registers[i].data_ready){
+                                cout << "Found Qj " << rs.Qj.value() << " in Result Status for " << rs.rs_id << endl;
+                                rs.Qj.reset();
+                                rs.Vj = 1;
+                            }
+                            if((rs.Qk == reg_stats.registers[i].rs_id) && reg_stats.registers[i].data_ready){
+                                cout << "Found Qk " << rs.Qk.value() << " in Result Status for " << rs.rs_id << endl;
+                                rs.Qk.reset();
+                                rs.Vk = 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        dout << "--------" << endl;
+        // Run each RS if their operands are ready
+        {
+            // All RS advance 1 cycle
+            // for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
+            //     for (auto&& rs : rs_vec) {  // for every RS of that type
+            //         if (rs.ready()) {
+            //             dout << debug::bg::magenta << rs.rs_id << " is running"
+            //                  << debug::reset << endl;
+            //             *rs.remain_cycle -= 1;
+            //         }
+            //     }
+            // }
+
+            // Check if any RS is completed
+            for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
+                for (auto&& rs : rs_vec) {  // for every RS of that type
+                    if (rs.completed()) {
+                        dout << debug::bg::green << rs.rs_id << " completed"
+                             << debug::reset << endl;
+                        cout << rs.rs_id << " completed" << endl;
+
+                        instr_trace.instr_trace[rs.Op->index]
+                            .status.cycleCompleted = cycle;
+                    }
+                }
+            }
+
             // Retire the oldest instruction first: bus arbitration
             {
-                vector< ReservationStation > completed_rs;
+                vector<ReservationStation> completed_rs;
                 for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
                     copy_if(
                         rs_vec.begin(), rs_vec.end(),
@@ -462,73 +559,11 @@ int main(int argc, char** argv) {
                     // Retire this instruction
                     // - Mark broadcast timestamp
                     instr_trace.instr_trace[min_completed_rs.Op->index]
-                        .status.cycleWriteResult = cycle;
+                        .status.cycleWriteResult = cycle + 1;
                     // - Clear the original RS in RSS
                     find(begin(rss.stations[rs_idx.rs_type]),
                          end(rss.stations[rs_idx.rs_type]), min_completed_rs)
                         ->clear();
-                }
-            }
-
-            // Broadcast what's in CDB to all registers and all RS
-            {
-                if (cdb.has_value()) {
-                    const ReservationStationId& cdb_val = cdb.value();
-                    dout << debug::bg::blue << "CDB broadcasting (" << cdb_val
-                         << ") to:" << debug::reset << endl;
-                    for (auto&& [fu, rs_vec] :
-                         rss.stations) {            // for every RS type
-                        for (auto&& rs : rs_vec) {  // for every RS of that type
-                            // if CDB has something Qj is waiting for
-                            if (rs.Qj == cdb_val) {
-                                dout << "  " << rs.rs_id << " Qj" << endl;
-                                rs.Qj.reset();
-                                rs.Vj = 1;
-                            }
-                            // if CDB has something Qk is waiting for
-                            if (rs.Qk == cdb_val) {
-                                dout << "  " << rs.rs_id << " Qk" << endl;
-                                rs.Qk.reset();
-                                rs.Vk = 1;
-                            }
-                        }
-                    }
-                    for (auto&& reg : reg_stats.registers) {
-                        // if CDB has something that any register is waiting for
-                        if (reg.rs_id == cdb_val) {
-                            dout << "  " << reg.rs_id.value() << " Reg" << endl;
-                            reg.data_ready = true;
-                        }
-                    }
-                    cdb.reset();
-                }
-            }
-        }
-
-        dout << "--------" << endl;
-        // Run each RS if their operands are ready
-        {
-            // All RS advance 1 cycle
-            for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
-                for (auto&& rs : rs_vec) {  // for every RS of that type
-                    if (rs.ready()) {
-                        dout << debug::bg::magenta << rs.rs_id << " is running"
-                             << debug::reset << endl;
-                        *rs.remain_cycle -= 1;
-                    }
-                }
-            }
-
-            // Check if any RS is completed
-            for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
-                for (auto&& rs : rs_vec) {  // for every RS of that type
-                    if (rs.completed()) {
-                        dout << debug::bg::green << rs.rs_id << " completed"
-                             << debug::reset << endl;
-
-                        instr_trace.instr_trace[rs.Op->index]
-                            .status.cycleCompleted = cycle;
-                    }
                 }
             }
         }
@@ -603,6 +638,15 @@ int main(int argc, char** argv) {
                 dout << "no more instructions to issue" << endl;
             }
         }
+        FunctionalUnit_t fu = FunctionalUnit_t::AddSub;
+        if(rss.stations.at(fu)[0].remain_cycle.has_value()){
+            cout << "RS Add0: cycle val: " << rss.stations.at(fu)[0].remain_cycle.value() << endl;
+        }
+        else{
+            cout << "RS Add0: not busy" << endl;
+        }
+        cout << "RS Add0: ready: " << rss.stations.at(fu)[0].ready() << endl;
+
 
         // Print everything
         {
@@ -709,7 +753,7 @@ int main(int argc, char** argv) {
 
     {  // At the end of the program, print Instruction Status Table for
        // grading
-        vector< InstructionStatus > instruction_status_vec;
+        vector<InstructionStatus> instruction_status_vec;
         generate_n(back_inserter(instruction_status_vec),
                    size(instr_trace.instr_trace), [&instr_trace]() {
                        static auto iter = begin(instr_trace.instr_trace);
