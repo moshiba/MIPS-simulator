@@ -507,6 +507,19 @@ int main(int argc, char** argv) {
 
                     free_rs->busy = true;
                     free_rs->Op = this_instr;
+                    // Logic for few functional units: Now that we have an entry in the
+                    // CDB, we need to make sure the register status doesn't have multiple 
+                    // reservation station entries of the same type
+                    cout << "Id: " << free_rs->rs_id << endl;
+                    for (size_t i=0; i<reg_stats.registers.size(); ++i) {
+                        // if the register status already has an entry for that free_rs
+                        if ((reg_stats.registers[i].rs_id == free_rs->rs_id) && 
+                        (i != free_rs->Op->dest)) {
+                            cout << "Reg F" << i << " is being reset" << endl;
+                            reg_stats.registers[i].rs_id.reset();
+                        }
+                    }
+
                     switch (instr_fu_type) {
                         case FunctionalUnit_t::Store: {
                             if (reg_stats.registers[this_dst].data_ready) {
@@ -542,6 +555,17 @@ int main(int argc, char** argv) {
                         }
                     }
                     free_rs->remain_cycle = this_instr.latency;
+                    // Logic for few functional units: Now that we have an entry in the
+                    // CDB, we need to make sure the register status doesn't have multiple 
+                    // reservation station entries of the same type
+                    // for (size_t i=0; i<reg_stats.registers.size(); ++i) {
+                    //     // if the register status already has an entry for that free_rs
+                    //     if ((reg_stats.registers[i].rs_id == free_rs->rs_id) && 
+                    //     (i != free_rs->Op->dest)) {
+                    //         cout << "Reg F" << i << " is being reset" << endl;
+                    //         reg_stats.registers[i].rs_id.reset();
+                    //     }
+                    // }
 
                     // reg_stats.registers[this_dst] = {free_rs->rs_id, false};
 
@@ -611,80 +635,24 @@ int main(int argc, char** argv) {
                     find(begin(rss.stations[rs_idx.rs_type]),
                          end(rss.stations[rs_idx.rs_type]), min_completed_rs)
                         ->clear();
+                
+                    // Logic for few functional units: Now that we have an entry in the
+                    // CDB, we need to make sure the register status doesn't have multiple 
+                    // reservation station entries of the same type
+                    // cout << "Dest: " << min_completed_rs.Op->dest << endl;
+                    // for (size_t i=0; i<reg_stats.registers.size(); ++i) {
+                    //     // if the register status already has an entry for that cdb
+                    //     if ((reg_stats.registers[i].rs_id == min_completed_rs.rs_id) && 
+                    //     (i != min_completed_rs.Op->dest)) {
+                    //         cout << "Reg F" << i << " is being reset" << endl;
+                    //         reg_stats.registers[i].rs_id.reset();
+                    //     }
+                    // }
                 }
             }
         }
 
         dout << "--------" << endl;
-        // // See if we can issue the next instruction
-        // {
-        //     if (instr_trace.instr_idx < instr_trace.instr_trace.size()) {
-        //         Instruction& this_instr = instr_trace.instruction();
-
-        //         // get the RS of the type of the instruction
-        //         const auto instr_fu_type = this_instr.fu_cat;
-        //         auto& rs_vec = rss.stations[instr_fu_type];
-        //         if (auto free_rs =
-        //                 find_if(begin(rs_vec), end(rs_vec),
-        //                         [](ReservationStation o) { return o.free(); });
-        //             free_rs != end(rs_vec)) {
-        //             // Found free RS for this FU type, issue instruction!
-        //             dout << "Issuing instruction[" << this_instr.index << "]"
-        //                  << endl;
-        //             this_instr.status.cycleIssued = cycle;
-        //             const unsigned this_op1 = this_instr.src1;
-        //             const unsigned this_op2 = this_instr.src2;
-        //             const unsigned this_dst = this_instr.dest;
-
-        //             free_rs->busy = true;
-        //             free_rs->Op = this_instr;
-        //             switch (instr_fu_type) {
-        //                 case FunctionalUnit_t::Store: {
-        //                     if (reg_stats.registers[this_dst].data_ready) {
-        //                         free_rs->Vj = this_op1 + this_op2;
-        //                         free_rs->Vk = this_op1 + this_op2;
-        //                     } else {
-        //                         free_rs->Qj =
-        //                             reg_stats.registers[this_dst].rs_id;
-        //                         free_rs->Qk =
-        //                             reg_stats.registers[this_dst].rs_id;
-        //                     }
-        //                     break;
-        //                 }
-        //                 case FunctionalUnit_t::Load: {
-        //                     free_rs->Vj = this_op1 + this_op2;
-        //                     free_rs->Vk = this_op1 + this_op2;
-        //                     reg_stats.registers[this_dst] = {free_rs->rs_id,
-        //                                                      false};
-        //                     break;
-        //                 }
-        //                 default: {
-        //                     free_rs->Qj = reg_stats.registers[this_op1].rs_id;
-        //                     if (reg_stats.registers[this_op1].data_ready) {
-        //                         free_rs->Vj = this_op1;
-        //                     }
-        //                     free_rs->Qk = reg_stats.registers[this_op2].rs_id;
-        //                     if (reg_stats.registers[this_op2].data_ready) {
-        //                         free_rs->Vk = this_op2;
-        //                     }
-        //                     reg_stats.registers[this_dst] = {free_rs->rs_id,
-        //                                                      false};
-        //                     break;
-        //                 }
-        //             }
-        //             free_rs->remain_cycle = this_instr.latency;
-
-        //             // reg_stats.registers[this_dst] = {free_rs->rs_id, false};
-
-        //             instr_trace.advance_to_next_instruction();
-        //         } else {
-        //             // No free RS for this FU type
-        //             // Do nothing
-        //         }
-        //     } else {
-        //         dout << "no more instructions to issue" << endl;
-        //     }
-        // }
 
         //Check the register result status to see if any values are available
         for(auto&& [fu, rs_vec] : rss.stations){
@@ -704,12 +672,22 @@ int main(int argc, char** argv) {
                     //     }
                     // }
                     if((rs.Qj == reg_stats.registers[i].rs_id) && reg_stats.registers[i].data_ready){
-                        cout << "Found Qj " << rs.Qj.value() << " in Result Status for " << rs.rs_id << endl;
+                        if(rs.Qj.has_value()){
+                            cout << "Found Qj " << rs.Qj.value() << " in F" << i << 
+                            " for " << rs.rs_id << endl;
+                        }
+                        // cout << "Found Qj " << rs.Qj.value() << " in F" << i << 
+                        // " for " << rs.rs_id << endl;
                         rs.Qj.reset();
                         rs.Vj = 1;
                     }
                     if((rs.Qk == reg_stats.registers[i].rs_id) && reg_stats.registers[i].data_ready){
-                        cout << "Found Qk " << rs.Qk.value() << " in Result Status for " << rs.rs_id << endl;
+                        if(rs.Qk.has_value()){
+                            cout << "Found Qk " << rs.Qk.value() << " in F" << i << 
+                            " for " << rs.rs_id << endl;
+                        }
+                        // cout << "Found Qk " << rs.Qk.value() << " in F" << i << 
+                        // " for " << rs.rs_id << endl;
                         rs.Qk.reset();
                         rs.Vk = 1;
                     }
