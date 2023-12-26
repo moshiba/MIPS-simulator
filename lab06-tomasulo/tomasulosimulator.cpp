@@ -261,7 +261,7 @@ class ReservationStation {
         remain_cycle.reset();
     }
 
-    bool free() { return !busy; }
+    bool free() const { return !busy; }
 
     bool operator==(const ReservationStation& other) const {
         return rs_id == other.rs_id && busy == other.busy && Op == other.Op &&
@@ -429,7 +429,8 @@ int main(int argc, char** argv) {
     auto instr_trace = InstructionTrace(inputtracename);
 
     unsigned cycle = 1;
-    while (1 && cycle < 60) {  // TODO: fix while loop
+    while (1 && cycle < 60) {
+        // All RS advance 1 cycle
         dout << "\n\n========\ncycle " << cycle << "\n========" << endl;
         cout << "\nCycle: " << cycle << endl;
         {
@@ -479,96 +480,11 @@ int main(int argc, char** argv) {
                     }
                     cdb.reset();
                 }
-
-                //Check the register result status to see if any values are available
-                for(auto&& [fu, rs_vec] : rss.stations){
-                    for(auto&& rs : rs_vec){
-                        for(size_t i=0; i<reg_stats.registers.size(); ++i){
-                            if((rs.Qj == reg_stats.registers[i].rs_id) && reg_stats.registers[i].data_ready){
-                                cout << "Found Qj " << rs.Qj.value() << " in Result Status for " << rs.rs_id << endl;
-                                rs.Qj.reset();
-                                rs.Vj = 1;
-                            }
-                            if((rs.Qk == reg_stats.registers[i].rs_id) && reg_stats.registers[i].data_ready){
-                                cout << "Found Qk " << rs.Qk.value() << " in Result Status for " << rs.rs_id << endl;
-                                rs.Qk.reset();
-                                rs.Vk = 1;
-                            }
-                        }
-                    }
-                }
             }
         }
 
         dout << "--------" << endl;
-        // Run each RS if their operands are ready
-        {
-            // All RS advance 1 cycle
-            // for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
-            //     for (auto&& rs : rs_vec) {  // for every RS of that type
-            //         if (rs.ready()) {
-            //             dout << debug::bg::magenta << rs.rs_id << " is running"
-            //                  << debug::reset << endl;
-            //             *rs.remain_cycle -= 1;
-            //         }
-            //     }
-            // }
 
-            // Check if any RS is completed
-            for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
-                for (auto&& rs : rs_vec) {  // for every RS of that type
-                    if (rs.completed()) {
-                        dout << debug::bg::green << rs.rs_id << " completed"
-                             << debug::reset << endl;
-                        cout << rs.rs_id << " completed" << endl;
-
-                        instr_trace.instr_trace[rs.Op->index]
-                            .status.cycleCompleted = cycle;
-                    }
-                }
-            }
-
-            // Retire the oldest instruction first: bus arbitration
-            {
-                vector<ReservationStation> completed_rs;
-                for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
-                    copy_if(
-                        rs_vec.begin(), rs_vec.end(),
-                        back_inserter(completed_rs),
-                        [](ReservationStation& rs) { return rs.completed(); });
-                }
-                if (completed_rs.empty()) {
-                    dout << debug::bg::red
-                         << "nothing is completed during this round"
-                         << debug::reset << endl;
-                } else {
-                    // Find the oldest completed instruction
-                    const auto& min_completed_rs = *min_element(
-                        completed_rs.begin(), completed_rs.end(),
-                        [](ReservationStation& rs_A, ReservationStation& rs_B) {
-                            return rs_A.Op->index < rs_B.Op->index;
-                        });
-
-                    // Broadcast this RS to CDB
-                    // - Retrace ReservationStationId from instruction
-                    const auto& rs_idx = min_completed_rs.rs_id;
-                    dout << debug::bg::cyan << rs_idx << " commit (broadcast)"
-                         << debug::reset << endl;
-                    cdb = rs_idx;
-
-                    // Retire this instruction
-                    // - Mark broadcast timestamp
-                    instr_trace.instr_trace[min_completed_rs.Op->index]
-                        .status.cycleWriteResult = cycle + 1;
-                    // - Clear the original RS in RSS
-                    find(begin(rss.stations[rs_idx.rs_type]),
-                         end(rss.stations[rs_idx.rs_type]), min_completed_rs)
-                        ->clear();
-                }
-            }
-        }
-
-        dout << "--------" << endl;
         // See if we can issue the next instruction
         {
             if (instr_trace.instr_idx < instr_trace.instr_trace.size()) {
@@ -638,12 +554,199 @@ int main(int argc, char** argv) {
                 dout << "no more instructions to issue" << endl;
             }
         }
+
+        // Run each RS if their operands are ready
+        {
+            // Check if any RS is completed
+            for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
+                for (auto&& rs : rs_vec) {  // for every RS of that type
+                    if (rs.completed()) {
+                        if(instr_trace.instr_trace[rs.Op->index].status.cycleCompleted == -1){
+                            // Only write in completion cycle if it hasn't been written before
+                            // Otherwise you will overwrite the previous completion cycle with 
+                            // the current cycle
+                            instr_trace.instr_trace[rs.Op->index]
+                            .status.cycleCompleted = cycle;
+                            dout << debug::bg::green << rs.rs_id << " completed"
+                             << debug::reset << endl;
+                            cout << rs.rs_id << " completed" << endl;
+                        }
+                    }
+                }
+            }
+
+            // Retire the oldest instruction first: bus arbitration
+            {
+                vector<ReservationStation> completed_rs;
+                for (auto&& [fu, rs_vec] : rss.stations) {  // for every RS type
+                    copy_if(
+                        rs_vec.begin(), rs_vec.end(),
+                        back_inserter(completed_rs),
+                        [](ReservationStation& rs) { return rs.completed(); });
+                }
+                if (completed_rs.empty()) {
+                    dout << debug::bg::red
+                         << "nothing is completed during this round"
+                         << debug::reset << endl;
+                } else {
+                    // Find the oldest completed instruction
+                    const auto& min_completed_rs = *min_element(
+                        completed_rs.begin(), completed_rs.end(),
+                        [](ReservationStation& rs_A, ReservationStation& rs_B) {
+                            return rs_A.Op->index < rs_B.Op->index;
+                        });
+
+                    // Broadcast this RS to CDB
+                    // - Retrace ReservationStationId from instruction
+                    const auto& rs_idx = min_completed_rs.rs_id;
+                    dout << debug::bg::cyan << rs_idx << " commit (broadcast)"
+                         << debug::reset << endl;
+                    cdb = rs_idx;
+
+                    // Retire this instruction
+                    // - Mark broadcast timestamp
+                    instr_trace.instr_trace[min_completed_rs.Op->index]
+                        .status.cycleWriteResult = cycle + 1;
+                    // - Clear the original RS in RSS
+                    find(begin(rss.stations[rs_idx.rs_type]),
+                         end(rss.stations[rs_idx.rs_type]), min_completed_rs)
+                        ->clear();
+                }
+            }
+        }
+
+        dout << "--------" << endl;
+        // // See if we can issue the next instruction
+        // {
+        //     if (instr_trace.instr_idx < instr_trace.instr_trace.size()) {
+        //         Instruction& this_instr = instr_trace.instruction();
+
+        //         // get the RS of the type of the instruction
+        //         const auto instr_fu_type = this_instr.fu_cat;
+        //         auto& rs_vec = rss.stations[instr_fu_type];
+        //         if (auto free_rs =
+        //                 find_if(begin(rs_vec), end(rs_vec),
+        //                         [](ReservationStation o) { return o.free(); });
+        //             free_rs != end(rs_vec)) {
+        //             // Found free RS for this FU type, issue instruction!
+        //             dout << "Issuing instruction[" << this_instr.index << "]"
+        //                  << endl;
+        //             this_instr.status.cycleIssued = cycle;
+        //             const unsigned this_op1 = this_instr.src1;
+        //             const unsigned this_op2 = this_instr.src2;
+        //             const unsigned this_dst = this_instr.dest;
+
+        //             free_rs->busy = true;
+        //             free_rs->Op = this_instr;
+        //             switch (instr_fu_type) {
+        //                 case FunctionalUnit_t::Store: {
+        //                     if (reg_stats.registers[this_dst].data_ready) {
+        //                         free_rs->Vj = this_op1 + this_op2;
+        //                         free_rs->Vk = this_op1 + this_op2;
+        //                     } else {
+        //                         free_rs->Qj =
+        //                             reg_stats.registers[this_dst].rs_id;
+        //                         free_rs->Qk =
+        //                             reg_stats.registers[this_dst].rs_id;
+        //                     }
+        //                     break;
+        //                 }
+        //                 case FunctionalUnit_t::Load: {
+        //                     free_rs->Vj = this_op1 + this_op2;
+        //                     free_rs->Vk = this_op1 + this_op2;
+        //                     reg_stats.registers[this_dst] = {free_rs->rs_id,
+        //                                                      false};
+        //                     break;
+        //                 }
+        //                 default: {
+        //                     free_rs->Qj = reg_stats.registers[this_op1].rs_id;
+        //                     if (reg_stats.registers[this_op1].data_ready) {
+        //                         free_rs->Vj = this_op1;
+        //                     }
+        //                     free_rs->Qk = reg_stats.registers[this_op2].rs_id;
+        //                     if (reg_stats.registers[this_op2].data_ready) {
+        //                         free_rs->Vk = this_op2;
+        //                     }
+        //                     reg_stats.registers[this_dst] = {free_rs->rs_id,
+        //                                                      false};
+        //                     break;
+        //                 }
+        //             }
+        //             free_rs->remain_cycle = this_instr.latency;
+
+        //             // reg_stats.registers[this_dst] = {free_rs->rs_id, false};
+
+        //             instr_trace.advance_to_next_instruction();
+        //         } else {
+        //             // No free RS for this FU type
+        //             // Do nothing
+        //         }
+        //     } else {
+        //         dout << "no more instructions to issue" << endl;
+        //     }
+        // }
+
+        //Check the register result status to see if any values are available
+        for(auto&& [fu, rs_vec] : rss.stations){
+            for(auto&& rs : rs_vec){
+                //cout << "Looping through reservation station: " << rs.rs_id << endl;
+                for(size_t i=0; i<reg_stats.registers.size(); ++i){
+                    // FunctionalUnit_t fu = FunctionalUnit_t::AddSub;
+                    // ReservationStationId my_rs_id(fu, 0);
+                    // if(rs.rs_id == my_rs_id){
+                    //     if(reg_stats.registers[i].rs_id.has_value()){
+                    //         cout << "For Add0, Reg "  << "F" << i << 
+                    //         " has value: " << reg_stats.registers[i].rs_id.value();
+                    //         cout << "  Is it ready? " << reg_stats.registers[i].data_ready << endl;
+                    //     }
+                    //     else{
+                    //         cout << "For Add0, Reg " << "F" << i << " has no value" << endl;
+                    //     }
+                    // }
+                    if((rs.Qj == reg_stats.registers[i].rs_id) && reg_stats.registers[i].data_ready){
+                        cout << "Found Qj " << rs.Qj.value() << " in Result Status for " << rs.rs_id << endl;
+                        rs.Qj.reset();
+                        rs.Vj = 1;
+                    }
+                    if((rs.Qk == reg_stats.registers[i].rs_id) && reg_stats.registers[i].data_ready){
+                        cout << "Found Qk " << rs.Qk.value() << " in Result Status for " << rs.rs_id << endl;
+                        rs.Qk.reset();
+                        rs.Vk = 1;
+                    }
+                }
+            }
+        }
+
         FunctionalUnit_t fu = FunctionalUnit_t::AddSub;
         if(rss.stations.at(fu)[0].remain_cycle.has_value()){
             cout << "RS Add0: cycle val: " << rss.stations.at(fu)[0].remain_cycle.value() << endl;
         }
         else{
             cout << "RS Add0: not busy" << endl;
+        }
+        if(rss.stations.at(fu)[0].Vj.has_value()){
+            cout << "RS Add0: Vj has value " << rss.stations.at(fu)[0].Vj.value() << endl;
+        }
+        else{
+            cout << "RS Add0: Vj has no value" << endl;
+        }
+        if(rss.stations.at(fu)[0].Vk.has_value()){
+            cout << "RS Add0: Vk has value " << rss.stations.at(fu)[0].Vk.value() << endl;
+        }
+        else{
+            cout << "RS Add0: Vk has no value" << endl;
+        }
+        if(rss.stations.at(fu)[0].Qj.has_value()){
+            cout << "RS Add0: Qj has value " << rss.stations.at(fu)[0].Qj.value() << endl;
+        }
+        else{
+            cout << "RS Add0: Qj has no value" << endl;
+        }
+        if(rss.stations.at(fu)[0].Qk.has_value()){
+            cout << "RS Add0: Qk has value " << rss.stations.at(fu)[0].Qk.value() << endl;
+        }
+        else{
+            cout << "RS Add0: Qk has no value" << endl;
         }
         cout << "RS Add0: ready: " << rss.stations.at(fu)[0].ready() << endl;
 
