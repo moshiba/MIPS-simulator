@@ -1,0 +1,33 @@
+Cycle 5:
+F0: Load0, dataRdy: Y, 
+F1: Load1, dataRdy: Y, 
+F2: Add0, dataRdy: N, 
+F3: Add1, dataRdy: N, 
+F4: , dataRdy: N, 
+F5: , dataRdy: N, 
+F6: , dataRdy: N, 
+F7: , dataRdy: N, 
+F8: , dataRdy: N, 
+F9: , dataRdy: N, 
+F10: , dataRdy: N, 
+F11: , dataRdy: N, 
+
+Cycle 10:
+F0: Load0, dataRdy: Y, 
+F1: Load1, dataRdy: Y, 
+F2: Add0, dataRdy: Y, 
+F3: Add1, dataRdy: N, 
+F4: , dataRdy: N, 
+F5: , dataRdy: N, 
+F6: , dataRdy: N, 
+F7: , dataRdy: N, 
+F8: , dataRdy: N, 
+F9: , dataRdy: N, 
+F10: , dataRdy: N, 
+F11: , dataRdy: N, 
+
+Instruction Status:
+Instr0: Issued: 1, Completed: 3, Write Result: 4, 
+Instr1: Issued: 2, Completed: 4, Write Result: 5, 
+Instr2: Issued: 3, Completed: 7, Write Result: 8, 
+Instr3: Issued: 4, Completed: 10, Write Result: 11, 
