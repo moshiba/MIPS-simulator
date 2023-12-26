@@ -429,7 +429,7 @@ int main(int argc, char** argv) {
     auto instr_trace = InstructionTrace(inputtracename);
 
     unsigned cycle = 1;
-    while (1 && cycle < 60) {
+    while (1) {
         // All RS advance 1 cycle
         dout << "\n\n========\ncycle " << cycle << "\n========" << endl;
         cout << "\nCycle: " << cycle << endl;
